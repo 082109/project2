@@ -1,2 +1,5 @@
-plotly
+streamlit
 requests
+pandas
+plotly
+google-genai
