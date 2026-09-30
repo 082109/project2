@@ -25,28 +25,32 @@ st.divider()
 # ---------------------------------------------------------
 st.sidebar.header("🔑 API 설정")
 
-client_id = st.secrets.get("NAVER_CLIENT_ID", "") or st.sidebar.text_input("Naver Client ID", type="password")
-client_secret = st.secrets.get("NAVER_CLIENT_SECRET", "") or st.sidebar.text_input("Naver Client Secret", type="password")
-gemini_key = st.secrets.get("GEMINI_API_KEY", "") or st.sidebar.text_input("Gemini API Key", type="password")
+client_id = st.secrets.get("NAVER_CLIENT_ID", "").strip() or st.sidebar.text_input("Naver Client ID", type="password").strip()
+client_secret = st.secrets.get("NAVER_CLIENT_SECRET", "").strip() or st.sidebar.text_input("Naver Client Secret", type="password").strip()
+gemini_key = st.secrets.get("GEMINI_API_KEY", "").strip() or st.sidebar.text_input("Gemini API Key", type="password").strip()
 
 if not (client_id and client_secret and gemini_key):
     st.info("💡 사이드바에 API 키를 입력하거나 `.streamlit/secrets.toml`에 설정해주세요.")
 
 # ---------------------------------------------------------
-# 3. 네이버 클라우드 API HUB 뉴스 호출 함수
+# 3. 네이버 클라우드 플랫폼(NCP) 전용 뉴스 호출 함수
 # ---------------------------------------------------------
 def fetch_naver_news(query, display_count=10):
-    url = f"https://naveropenapi.apigw.ntruss.com/map-place/v1/search/news.json?query={query}&display={display_count}&sort=date"
+    # 네이버 클라우드 플랫폼(NCP) API Gateway 엔드포인트
+    url = f"https://naveropenapi.apigw.ntruss.com/debug/v1/search/news.json?query={query}&display={display_count}&sort=date"
+    
+    # NCP 전용 인증 헤더
     headers = {
         "x-ncp-apigw-api-key-id": client_id,
         "x-ncp-apigw-api-key": client_secret
     }
     
     response = requests.get(url, headers=headers)
+
     if response.status_code == 200:
         return response.json().get('items', [])
     else:
-        st.error(f"네이버 API 호출 실패 (상태 코드: {response.status_code}) - Client ID와 Secret을 확인해 주세요.")
+        st.error(f"네이버 API 호출 실패 (상태 코드: {response.status_code}) - NCP 애플리케이션 서비스 설정 및 API 키를 다시 확인해 주세요.")
         return []
 
 # ---------------------------------------------------------
@@ -78,7 +82,6 @@ def analyze_article_with_gemini(title, description, api_key):
         )
         text = response.text.strip()
         
-        # JSON 파싱 문제 방지
         start_idx = text.find('{')
         end_idx = text.rfind('}')
         if start_idx != -1 and end_idx != -1:
