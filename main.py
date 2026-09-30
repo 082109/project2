@@ -36,10 +36,8 @@ if not (client_id and client_secret and gemini_key):
 # 3. 네이버 클라우드 API HUB 뉴스 호출 함수
 # ---------------------------------------------------------
 def fetch_naver_news(query, display_count=10):
-    # 네이버 클라우드 플랫폼 API HUB 전용 URL
     url = f"https://naveropenapi.apigw.ntruss.com/debug/v1/search/news.json?query={query}&display={display_count}&sort=date"
     
-    # 네이버 클라우드 플랫폼 전용 인증 헤더
     headers = {
         "x-ncp-apigw-api-key-id": client_id,
         "x-ncp-apigw-api-key": client_secret
@@ -80,7 +78,122 @@ def analyze_article_with_gemini(title, description, api_key):
             contents=prompt,
         )
         text = response.text.strip()
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0].strip()
-        elif "```" in text:
-            text = text.split("
+        
+        # JSON 파싱 문제 방지
+        start_idx = text.find('{')
+        end_idx = text.rfind('}')
+        if start_idx != -1 and end_idx != -1:
+            json_str = text[start_idx:end_idx+1]
+            return json.loads(json_str)
+        else:
+            return json.loads(text)
+            
+    except Exception as e:
+        return {
+            "summary": "AI 분석을 완료하지 못했습니다.",
+            "frame_category": "기타",
+            "bias_score": 0,
+            "key_keywords": ["분석오류"]
+        }
+
+# ---------------------------------------------------------
+# 5. 메인 UI 및 검색 실행
+# ---------------------------------------------------------
+col_input1, col_input2 = st.columns([3, 1])
+
+with col_input1:
+    search_query = st.text_input("🔍 분석할 미디어 이슈/키워드를 입력하세요", value="마약")
+
+with col_input2:
+    num_articles = st.selectbox("분석 기사 수", options=[5, 10, 15, 20], index=1)
+
+start_analysis = st.button("🚀 뉴스 수집 & AI 분석 시작", use_container_width=True)
+
+if start_analysis:
+    if not (client_id and client_secret and gemini_key):
+        st.error("❌ Naver Client ID, Naver Client Secret, Gemini API 키가 모두 입력되어야 합니다.")
+    else:
+        with st.spinner("네이버 뉴스 데이터 수집 중..."):
+            news_items = fetch_naver_news(search_query, num_articles)
+        
+        if not news_items:
+            st.warning("수집된 데이터가 없습니다. 키워드를 변경하거나 API 키를 확인하세요.")
+        else:
+            st.success(f"총 {len(news_items)}개의 최신 기사를 가져왔습니다. Gemini AI 분석 중...")
+            
+            progress_bar = st.progress(0)
+            analyzed_list = []
+            
+            for idx, item in enumerate(news_items):
+                clean_title = item.get('title', '').replace("<b>", "").replace("</b>", "").replace("&quot;", '"').replace("&amp;", "&")
+                clean_desc = item.get('description', '').replace("<b>", "").replace("</b>", "").replace("&quot;", '"').replace("&amp;", "&")
+                
+                ai_res = analyze_article_with_gemini(clean_title, clean_desc, gemini_key)
+                
+                analyzed_list.append({
+                    "제목": clean_title,
+                    "AI 요약": ai_res.get("summary", ""),
+                    "보도 프레임": ai_res.get("frame_category", "기타"),
+                    "편향성 점수": ai_res.get("bias_score", 0),
+                    "핵심 키워드": ", ".join(ai_res.get("key_keywords", [])),
+                    "링크": item.get('originallink', item.get('link', '#'))
+                })
+                
+                progress_bar.progress((idx + 1) / len(news_items))
+            
+            df = pd.DataFrame(analyzed_list)
+            st.toast("AI 분석 완료!", icon="🎉")
+
+            # ---------------------------------------------------------
+            # 6. 데이터 시각화 대시보드
+            # ---------------------------------------------------------
+            st.subheader("📊 미디어 보도 경향 분석 결과")
+            
+            tab1, tab2 = st.tabs(["보도 프레임 분석", "편향성/어조 분포"])
+            
+            with tab1:
+                col_chart1, col_chart2 = st.columns([1, 1])
+                with col_chart1:
+                    frame_counts = df['보도 프레임'].value_counts().reset_index()
+                    frame_counts.columns = ['보도 프레임', '기사 수']
+                    fig_pie = px.pie(
+                        frame_counts, 
+                        values='기사 수', 
+                        names='보도 프레임',
+                        title="언론 보도 프레임 점유율",
+                        hole=0.4,
+                        color_discrete_sequence=px.colors.qualitative.Pastel
+                    )
+                    st.plotly_chart(fig_pie, use_container_width=True)
+                
+                with col_chart2:
+                    st.markdown("#### 💡 프레임 분석 해설")
+                    st.write("언론이 이 주제를 다룰 때 어떤 **프레임(시각)**을 집중적으로 사용하는지 비율로 보여줍니다.")
+                    st.dataframe(frame_counts, hide_index=True, use_container_width=True)
+
+            with tab2:
+                fig_bar = px.bar(
+                    df,
+                    x='제목',
+                    y='편향성 점수',
+                    color='편향성 점수',
+                    color_continuous_scale='RdBu_r',
+                    title="기사별 어조/편향성 점수 (-5: 비판적 ~ +5: 옹호적)",
+                    range_y=[-5, 5]
+                )
+                fig_bar.update_layout(xaxis_showticklabels=False)
+                st.plotly_chart(fig_bar, use_container_width=True)
+
+            # ---------------------------------------------------------
+            # 7. 기사 상세 카드 목록
+            # ---------------------------------------------------------
+            st.subheader("📋 기사별 AI 분석 상세")
+            for idx, row in df.iterrows():
+                with st.expander(f"[{row['보도 프레임']}] {row['제목']}"):
+                    col_a, col_b = st.columns([3, 1])
+                    with col_a:
+                        st.markdown(f"**AI 요약:** {row['AI 요약']}")
+                        st.markdown(f"**핵심 키워드:** `{row['핵심 키워드']}`")
+                    with col_b:
+                        st.metric("편향성/어조 점수", f"{row['편향성 점수']} / 5")
+                        st.markdown(f"[🔗 원문 기사 링크]({row['링크']})")
