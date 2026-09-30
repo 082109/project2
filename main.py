@@ -33,16 +33,16 @@ if not (client_id and client_secret and gemini_key):
     st.info("💡 사이드바에 API 키를 입력하거나 `.streamlit/secrets.toml`에 설정해주세요.")
 
 # ---------------------------------------------------------
-# 3. 네이버 클라우드 플랫폼(NCP) 전용 뉴스 호출 함수
+# 3. 네이버 클라우드 API HUB 뉴스 호출 함수 (URL 수정 완료)
 # ---------------------------------------------------------
 def fetch_naver_news(query, display_count=10):
-    # 네이버 클라우드 플랫폼(NCP) API Gateway 엔드포인트
-    url = f"https://naveropenapi.apigw.ntruss.com/debug/v1/search/news.json?query={query}&display={display_count}&sort=date"
+    # NAVER API HUB 뉴스 검색 정식 URL
+    url = f"https://naverapihub.apigw.ntruss.com/search/v1/news?query={query}&display={display_count}&sort=date"
     
-    # NCP 전용 인증 헤더
+    # NAVER API HUB 전용 헤더
     headers = {
-        "x-ncp-apigw-api-key-id": client_id,
-        "x-ncp-apigw-api-key": client_secret
+        "X-NCP-APIGW-API-KEY-ID": client_id,
+        "X-NCP-APIGW-API-KEY": client_secret
     }
     
     response = requests.get(url, headers=headers)
@@ -50,7 +50,7 @@ def fetch_naver_news(query, display_count=10):
     if response.status_code == 200:
         return response.json().get('items', [])
     else:
-        st.error(f"네이버 API 호출 실패 (상태 코드: {response.status_code}) - NCP 애플리케이션 서비스 설정 및 API 키를 다시 확인해 주세요.")
+        st.error(f"네이버 API 호출 실패 (상태 코드: {response.status_code}) - Client ID와 Secret을 다시 확인해 주세요.")
         return []
 
 # ---------------------------------------------------------
