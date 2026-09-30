@@ -36,8 +36,7 @@ if not (client_id and client_secret and gemini_key):
 # 3. 네이버 클라우드 API HUB 뉴스 호출 함수
 # ---------------------------------------------------------
 def fetch_naver_news(query, display_count=10):
-    url = f"https://naveropenapi.apigw.ntruss.com/debug/v1/search/news.json?query={query}&display={display_count}&sort=date"
-    
+    url = f"https://naveropenapi.apigw.ntruss.com/map-place/v1/search/news.json?query={query}&display={display_count}&sort=date"
     headers = {
         "x-ncp-apigw-api-key-id": client_id,
         "x-ncp-apigw-api-key": client_secret
