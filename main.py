@@ -1,30 +1,151 @@
 import streamlit as st
-import requests
+import urllib.request
+import urllib.parse
 import json
-import pandas as pd
-import plotly.express as px
-from google import genai
+from datetime import datetime
+import io
+import os
+import requests
+from PIL import Image, ImageDraw, ImageFont
 
 # ---------------------------------------------------------
-# 1. 페이지 기본 설정 및 타이틀
+# 1. 페이지 기본 설정 및 스타일링
 # ---------------------------------------------------------
 st.set_page_config(
-    page_title="미디어 프레이밍 & 편향성 분석기",
-    page_icon="📰",
+    page_title="FrameLens - AI 미디어 포털",
+    page_icon="🎬",
     layout="wide"
 )
 
-st.title("📰 미디어커뮤니케이션 : 실시간 뉴스 프레이밍 & AI 편향성 분석")
 st.markdown("""
-이 웹앱은 **네이버 클라우드 API HUB**를 통해 실시간 기사를 수집하고, **Gemini AI API**를 활용해 기사별 **보도 프레임**과 **편향성/어조**를 분석한 뒤 **데이터 저널리즘 차트**로 시각화합니다.
-""")
-st.divider()
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;600;700;900&display=swap');
+
+    .stApp {
+        background-color: #080c14;
+        color: #f3f4f6;
+        font-family: 'Noto Serif KR', serif !important;
+    }
+    section[data-testid="stSidebar"] {
+        background-color: #0f172a;
+        border-right: 1px solid #1e293b;
+        font-family: 'Noto Serif KR', serif !important;
+    }
+    
+    .hero-title {
+        font-family: 'Noto Serif KR', serif !important;
+        font-size: 3.5rem;
+        font-weight: 900;
+        color: #ffffff;
+        text-align: center;
+        margin-top: 40px;
+        margin-bottom: 8px;
+        letter-spacing: -1.5px;
+    }
+    .hero-subtitle {
+        font-family: 'Noto Serif KR', serif !important;
+        color: #94a3b8;
+        font-size: 1.15rem;
+        text-align: center;
+        margin-bottom: 40px;
+        font-weight: 300;
+    }
+
+    .search-container {
+        background: #0d1527;
+        border: 2px solid #22d3ee;
+        border-radius: 24px;
+        padding: 12px 20px;
+        box-shadow: 0 0 35px rgba(34, 211, 238, 0.25);
+        margin: 0 auto 30px auto;
+        max-width: 800px;
+    }
+
+    div[data-baseweb="input"] {
+        background-color: transparent !important;
+        border: none !important;
+        color: #ffffff !important;
+        font-size: 1.15rem !important;
+        font-family: 'Noto Serif KR', serif !important;
+    }
+    div[data-baseweb="input"] input {
+        color: #ffffff !important;
+    }
+
+    .stButton > button, div[data-testid="stFormSubmitButton"] > button {
+        background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+        color: #ffffff;
+        border: none;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 0.95rem;
+        height: 48px;
+        box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+        transition: all 0.2s ease;
+        font-family: 'Noto Serif KR', serif !important;
+        width: 100%;
+    }
+    .stButton > button:hover, div[data-testid="stFormSubmitButton"] > button:hover {
+        background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+        box-shadow: 0 6px 18px rgba(56, 189, 248, 0.45);
+        transform: translateY(-1px);
+    }
+
+    .right-card-box {
+        background-color: #0d1527;
+        border: 1px solid #1e293b;
+        border-radius: 16px;
+        padding: 20px;
+        margin-top: 15px;
+        margin-bottom: 20px;
+    }
+
+    .image-preview-container {
+        background: #0d1527;
+        border: 2px solid #22d3ee;
+        border-radius: 20px;
+        padding: 30px;
+        margin-top: 25px;
+        box-shadow: 0 0 30px rgba(34, 211, 238, 0.25);
+    }
+
+    h1, h2, h3, h4, label {
+        font-family: 'Noto Serif KR', serif !important;
+    }
+
+    hr {
+        border-color: #1e293b !important;
+        margin: 20px 0 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# 2. API 키 불러오기 (secrets.toml 또는 사이드바 입력)
+# 2. 세션 상태 초기화 및 폰트 준비
 # ---------------------------------------------------------
-st.sidebar.header("🔑 API 설정")
+if 'step' not in st.session_state:
+    st.session_state['step'] = 'search'
 
+if 'page_number' not in st.session_state:
+    st.session_state['page_number'] = 1
+
+def get_korean_font(font_size=18):
+    font_path = "NanumGothic.ttf"
+    if not os.path.exists(font_path):
+        try:
+            url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Bold.ttf"
+            urllib.request.urlretrieve(url, font_path)
+        except Exception:
+            pass
+    
+    try:
+        if os.path.exists(font_path):
+            return ImageFont.truetype(font_path, font_size)
+    except Exception:
+        pass
+    return ImageFont.load_default()
+
+st.sidebar.header("API 설정")
 client_id = st.secrets.get("NAVER_CLIENT_ID", "").strip() or st.sidebar.text_input("Naver Client ID", type="password").strip()
 client_secret = st.secrets.get("NAVER_CLIENT_SECRET", "").strip() or st.sidebar.text_input("Naver Client Secret", type="password").strip()
 gemini_key = st.secrets.get("GEMINI_API_KEY", "").strip() or st.sidebar.text_input("Gemini API Key", type="password").strip()
@@ -32,170 +153,99 @@ gemini_key = st.secrets.get("GEMINI_API_KEY", "").strip() or st.sidebar.text_inp
 if not (client_id and client_secret and gemini_key):
     st.info("💡 사이드바에 API 키를 입력하거나 `.streamlit/secrets.toml`에 설정해주세요.")
 
-# ---------------------------------------------------------
-# 3. 네이버 클라우드 API HUB 뉴스 호출 함수 (URL 수정 완료)
-# ---------------------------------------------------------
-def fetch_naver_news(query, display_count=10):
-    # NAVER API HUB 뉴스 검색 정식 URL
-    url = f"https://naverapihub.apigw.ntruss.com/search/v1/news?query={query}&display={display_count}&sort=date"
+def parse_pub_date(pub_date_str):
+    if not pub_date_str:
+        return "날짜 정보 없음"
+    try:
+        dt = datetime.strptime(pub_date_str, "%a, %d %b %Y %H:%M:%S %z")
+        return dt.strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return pub_date_str
+
+def fetch_naver_news(query, display_count=100):
+    search_term = query.strip() if query and query.strip() else "뉴스"
+    encText = urllib.parse.quote(search_term)
+    url = f"https://naverapihub.apigw.ntruss.com/search/v1/news?query={encText}&display={display_count}&sort=date"
     
-    # NAVER API HUB 전용 헤더
-    headers = {
-        "X-NCP-APIGW-API-KEY-ID": client_id,
-        "X-NCP-APIGW-API-KEY": client_secret
-    }
-    
-    response = requests.get(url, headers=headers)
-
-    if response.status_code == 200:
-        return response.json().get('items', [])
-    else:
-        st.error(f"네이버 API 호출 실패 (상태 코드: {response.status_code}) - Client ID와 Secret을 다시 확인해 주세요.")
-        return []
-
-# ---------------------------------------------------------
-# 4. Gemini AI 기사 분석 함수
-# ---------------------------------------------------------
-def analyze_article_with_gemini(title, description, api_key):
-    client = genai.Client(api_key=api_key)
-    
-    prompt = f"""
-    당신은 미디어 비평가이자 데이터 저널리스트입니다. 
-    다음 뉴스 기사의 제목과 요약 내용을 바탕으로 언론 보도 프레임과 편향성을 객관적으로 분석해주세요.
-
-    기사 제목: {title}
-    기사 요약: {description}
-
-    반드시 다른 설명 없이 오직 아래 형식을 맞춘 유효한 JSON 형식으로만 응답하세요:
-    {{
-        "summary": "기사의 핵심 2줄 요약",
-        "frame_category": "보도 프레임 (다음 중 하나 선택: 갈등·대립 / 경제적 여파 / 정책·제도 / 인간적 비극 / 책임 소재 / 기타)",
-        "bias_score": -5부터 5 사이의 정수 (-5: 매우 비판적, 0: 중립·객관적, 5: 매우 옹호적),
-        "key_keywords": ["주요키워드1", "주요키워드2", "주요키워드3"]
-    }}
-    """
+    req = urllib.request.Request(url)
+    req.add_header("X-NCP-APIGW-API-KEY-ID", client_id)
+    req.add_header("X-NCP-APIGW-API-KEY", client_secret)
     
     try:
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
-        )
-        text = response.text.strip()
-        
-        start_idx = text.find('{')
-        end_idx = text.rfind('}')
-        if start_idx != -1 and end_idx != -1:
-            json_str = text[start_idx:end_idx+1]
-            return json.loads(json_str)
+        with urllib.request.urlopen(req) as response:
+            if response.getcode() == 200:
+                data = json.loads(response.read().decode('utf-8'))
+                return data.get('items', [])
+        return []
+    except Exception:
+        return []
+
+def draw_wrapped_text(draw, text, font, fill, x, y, max_width, line_spacing=6):
+    words = text.split()
+    line = ""
+    curr_y = y
+    for word in words:
+        test_line = line + word + " "
+        if draw.textlength(test_line, font=font) <= max_width:
+            line = test_line
         else:
-            return json.loads(text)
-            
-    except Exception as e:
-        return {
-            "summary": "AI 분석을 완료하지 못했습니다.",
-            "frame_category": "기타",
-            "bias_score": 0,
-            "key_keywords": ["분석오류"]
-        }
+            draw.text((x, curr_y), line.strip(), fill=fill, font=font)
+            curr_y += font.size + line_spacing
+            line = word + " "
+    if line:
+        draw.text((x, curr_y), line.strip(), fill=fill, font=font)
+        curr_y += font.size + line_spacing
+    return curr_y
 
 # ---------------------------------------------------------
-# 5. 메인 UI 및 검색 실행
+# [핵심] Gemini API로 뉴스 분석 후 AI 일러스트 생성 및 하단 텍스트 합성
 # ---------------------------------------------------------
-col_input1, col_input2 = st.columns([3, 1])
-
-with col_input1:
-    search_query = st.text_input("🔍 분석할 미디어 이슈/키워드를 입력하세요", value="마약")
-
-with col_input2:
-    num_articles = st.selectbox("분석 기사 수", options=[5, 10, 15, 20], index=1)
-
-start_analysis = st.button("🚀 뉴스 수집 & AI 분석 시작", use_container_width=True)
-
-if start_analysis:
-    if not (client_id and client_secret and gemini_key):
-        st.error("❌ Naver Client ID, Naver Client Secret, Gemini API 키가 모두 입력되어야 합니다.")
+def create_real_ai_poster_image(title, desc, content_format, api_key):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={api_key}"
+    
+    if content_format == "만화 (컷툰/웹툰)":
+        style_desc = "a 4-panel webtoon comic strip with cute characters and speech bubbles"
+    elif content_format == "포스터":
+        style_desc = "a professional public campaign poster illustration with striking visual symbols"
     else:
-        with st.spinner("네이버 뉴스 데이터 수집 중..."):
-            news_items = fetch_naver_news(search_query, num_articles)
-        
-        if not news_items:
-            st.warning("수집된 데이터가 없습니다. 키워드를 변경하거나 API 키를 확인하세요.")
-        else:
-            st.success(f"총 {len(news_items)}개의 최신 기사를 가져왔습니다. Gemini AI 분석 중...")
-            
-            progress_bar = st.progress(0)
-            analyzed_list = []
-            
-            for idx, item in enumerate(news_items):
-                clean_title = item.get('title', '').replace("<b>", "").replace("</b>", "").replace("&quot;", '"').replace("&amp;", "&")
-                clean_desc = item.get('description', '').replace("<b>", "").replace("</b>", "").replace("&quot;", '"').replace("&amp;", "&")
-                
-                ai_res = analyze_article_with_gemini(clean_title, clean_desc, gemini_key)
-                
-                analyzed_list.append({
-                    "제목": clean_title,
-                    "AI 요약": ai_res.get("summary", ""),
-                    "보도 프레임": ai_res.get("frame_category", "기타"),
-                    "편향성 점수": ai_res.get("bias_score", 0),
-                    "핵심 키워드": ", ".join(ai_res.get("key_keywords", [])),
-                    "링크": item.get('originallink', item.get('link', '#'))
-                })
-                
-                progress_bar.progress((idx + 1) / len(news_items))
-            
-            df = pd.DataFrame(analyzed_list)
-            st.toast("AI 분석 완료!", icon="🎉")
+        style_desc = "a clean statistical data infographic design with bar charts and icons"
 
-            # ---------------------------------------------------------
-            # 6. 데이터 시각화 대시보드
-            # ---------------------------------------------------------
-            st.subheader("📊 미디어 보도 경향 분석 결과")
-            
-            tab1, tab2 = st.tabs(["보도 프레임 분석", "편향성/어조 분포"])
-            
-            with tab1:
-                col_chart1, col_chart2 = st.columns([1, 1])
-                with col_chart1:
-                    frame_counts = df['보도 프레임'].value_counts().reset_index()
-                    frame_counts.columns = ['보도 프레임', '기사 수']
-                    fig_pie = px.pie(
-                        frame_counts, 
-                        values='기사 수', 
-                        names='보도 프레임',
-                        title="언론 보도 프레임 점유율",
-                        hole=0.4,
-                        color_discrete_sequence=px.colors.qualitative.Pastel
-                    )
-                    st.plotly_chart(fig_pie, use_container_width=True)
-                
-                with col_chart2:
-                    st.markdown("#### 💡 프레임 분석 해설")
-                    st.write("언론이 이 주제를 다룰 때 어떤 **프레임(시각)**을 집중적으로 사용하는지 비율로 보여줍니다.")
-                    st.dataframe(frame_counts, hide_index=True, use_container_width=True)
+    prompt = f"Create a detailed English image generation prompt for {style_desc} about this news: Title: {title}, Summary: {desc}. Output ONLY the prompt text."
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    data = json.dumps(payload).encode('utf-8')
+    req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+    
+    img_prompt = f"Professional illustration about {title}"
+    try:
+        with urllib.request.urlopen(req) as response:
+            if response.getcode() == 200:
+                res_json = json.loads(response.read().decode('utf-8'))
+                img_prompt = res_json['candidates'][0]['content']['parts'][0]['text'].strip()
+    except Exception:
+        pass
 
-            with tab2:
-                fig_bar = px.bar(
-                    df,
-                    x='제목',
-                    y='편향성 점수',
-                    color='편향성 점수',
-                    color_continuous_scale='RdBu_r',
-                    title="기사별 어조/편향성 점수 (-5: 비판적 ~ +5: 옹호적)",
-                    range_y=[-5, 5]
-                )
-                fig_bar.update_layout(xaxis_showticklabels=False)
-                st.plotly_chart(fig_bar, use_container_width=True)
+    encoded_prompt = urllib.parse.quote(img_prompt)
+    ai_image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=700&height=550&nologo=true"
+    
+    try:
+        res = requests.get(ai_image_url, timeout=15)
+        ai_img = Image.open(io.BytesIO(res.content)).convert("RGB")
+    except Exception:
+        ai_img = Image.new("RGB", (700, 550), color=(230, 235, 245))
 
-            # ---------------------------------------------------------
-            # 7. 기사 상세 카드 목록
-            # ---------------------------------------------------------
-            st.subheader("📋 기사별 AI 분석 상세")
-            for idx, row in df.iterrows():
-                with st.expander(f"[{row['보도 프레임']}] {row['제목']}"):
-                    col_a, col_b = st.columns([3, 1])
-                    with col_a:
-                        st.markdown(f"**AI 요약:** {row['AI 요약']}")
-                        st.markdown(f"**핵심 키워드:** `{row['핵심 키워드']}`")
-                    with col_b:
-                        st.metric("편향성/어조 점수", f"{row['편향성 점수']} / 5")
-                        st.markdown(f"[🔗 원문 기사 링크]({row['링크']})")
+    poster_w, poster_h = 700, 950
+    poster = Image.new("RGB", (poster_w, poster_h), color=(255, 255, 255))
+    poster.paste(ai_img, (0, 0))
+
+    draw = ImageDraw.Draw(poster)
+    draw.rectangle([0, 550, poster_w, poster_h], fill=(250, 250, 252))
+    draw.line([(0, 550), (poster_w, 550)], fill=(200, 205, 215), width=3)
+
+    f_badge = get_korean_font(13)
+    f_catch = get_korean_font(24)
+    f_body = get_korean_font(14)
+
+    draw.text((40, 580), f"📌 [{content_format.upper()}] 핵심 메시지", fill=(2, 132, 199), font=f_badge)
+    draw_wrapped_text(draw, f"\"{title}\"", f_catch, (15, 23, 42), 40, 620, poster_w - 80, line_spacing=8)
+    draw_wrapped_text(draw, desc[:150] + "...", f_body, (100, 116, 139), 40, 770, poster_w - 80)
+    draw.text((40,
