@@ -5,7 +5,9 @@ import json
 from datetime import datetime
 import io
 import os
+import time
 import requests
+import random
 from PIL import Image, ImageDraw, ImageFont
 
 # ---------------------------------------------------------
@@ -180,7 +182,7 @@ def fetch_naver_news(query, display_count=100):
     except Exception:
         return []
 
-def draw_wrapped_text(draw, text, font, fill, x, y, max_width, line_spacing=6):
+def draw_wrapped_text(draw, text, font, fill, x, y, max_width, line_spacing=4):
     words = text.split()
     line = ""
     curr_y = y
@@ -198,54 +200,444 @@ def draw_wrapped_text(draw, text, font, fill, x, y, max_width, line_spacing=6):
     return curr_y
 
 # ---------------------------------------------------------
-# [핵심] Gemini API로 뉴스 분석 후 AI 일러스트 생성 및 하단 텍스트 합성
+# [핵심] 이미지 무조건 불러오는 강건한 Pollinations AI 엔진
 # ---------------------------------------------------------
-def create_real_ai_poster_image(title, desc, content_format, api_key):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={api_key}"
+def fetch_ai_panel_image(prompt_text, index):
+    clean_prompt = prompt_text.replace("\n", " ").strip()
+    encoded_prompt = urllib.parse.quote(f"2D anime webtoon style, {clean_prompt}")
     
-    if content_format == "만화 (컷툰/웹툰)":
-        style_desc = "a 4-panel webtoon comic strip with cute characters and speech bubbles"
-    elif content_format == "포스터":
-        style_desc = "a professional public campaign poster illustration with striking visual symbols"
-    else:
-        style_desc = "a clean statistical data infographic design with bar charts and icons"
+    for attempt in range(5):
+        seed = random.randint(1000, 99999)
+        ai_image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=400&height=400&seed={seed}&nologo=true"
+        try:
+            res = requests.get(ai_image_url, timeout=30)
+            if res.status_code == 200 and len(res.content) > 2000:
+                img = Image.open(io.BytesIO(res.content)).convert("RGB")
+                w, h = img.size
+                if h > 50:
+                    img = img.crop((0, 0, w, h - 30))
+                return img.resize((380, 380))
+        except Exception:
+            time.sleep(1.2)
+            
+    # 백업 이미지 생성
+    fallback_colors = [(219, 234, 254), (254, 226, 226), (220, 252, 231), (254, 243, 199)]
+    fallback_img = Image.new("RGB", (380, 380), color=fallback_colors[index % 4])
+    draw_f = ImageDraw.Draw(fallback_img)
+    draw_f.rectangle([20, 20, 360, 360], outline=(30, 41, 59), width=3)
+    f_f = get_korean_font(16)
+    draw_f.text((60, 180), f"🎨 웹툰 장면 {index+1}", fill=(30, 41, 59), font=f_f)
+    return fallback_img
 
-    prompt = f"Create a detailed English image generation prompt for {style_desc} about this news: Title: {title}, Summary: {desc}. Output ONLY the prompt text."
+def generate_comic_scenario(title, desc, user_feedback, api_key):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={api_key}"
+    feedback_str = f"User Feedback: {user_feedback}" if user_feedback else ""
+    
+    prompt = f"""
+    당신은 전문 웹툰 작가입니다. 다음 뉴스 기사를 바탕으로 인스타그램 4컷 만화의 각 컷별 서로 다른 영문 이미지 프롬프트와 한국어 대사를 JSON으로 작성하세요.
+    - 뉴스 제목: {title}
+    - 뉴스 요약: {desc}
+    {feedback_str}
+    
+    JSON 형식:
+    {{
+      "cut1_prompt": "webtoon illustration panel 1 of student preparing for exam", "cut1_speech": "드디어 시험 날이 다가왔어!",
+      "cut2_prompt": "webtoon illustration panel 2 of studying hard in class", "cut2_speech": "범위가 정말 많지만 화이팅!",
+      "cut3_prompt": "webtoon illustration panel 3 of getting top results and score", "cut3_speech": "와! 당당히 합격했어!",
+      "cut4_prompt": "webtoon illustration panel 4 of happy student celebrating with friends", "cut4_speech": "꿈을 향해 한 걸음 더!"
+    }}
+    """
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     data = json.dumps(payload).encode('utf-8')
     req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
-    
-    img_prompt = f"Professional illustration about {title}"
     try:
         with urllib.request.urlopen(req) as response:
             if response.getcode() == 200:
                 res_json = json.loads(response.read().decode('utf-8'))
-                img_prompt = res_json['candidates'][0]['content']['parts'][0]['text'].strip()
+                raw_text = res_json['candidates'][0]['content']['parts'][0]['text']
+                clean_json = raw_text[raw_text.find("{"):raw_text.rfind("}")+1]
+                return json.loads(clean_json)
     except Exception:
         pass
+    return {
+        "cut1_prompt": f"webtoon illustration showing start of {title}", "cut1_speech": "드디어 시작이다!",
+        "cut2_prompt": f"webtoon illustration showing process of {title}", "cut2_speech": "정말 흥미진진한데?",
+        "cut3_prompt": f"webtoon illustration showing success of {title}", "cut3_speech": "결과가 성공적이야!",
+        "cut4_prompt": f"webtoon illustration showing conclusion of {title}", "cut4_speech": "앞으로가 기대돼!"
+    }
 
-    encoded_prompt = urllib.parse.quote(img_prompt)
-    ai_image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=700&height=550&nologo=true"
+def create_4cut_comic_image(comic_data, article_title):
+    img_w, img_h = 820, 890
+    image = Image.new("RGB", (img_w, img_h), color=(255, 255, 255))
+    draw = ImageDraw.Draw(image)
+
+    f_maintitle = get_korean_font(16)
+    f_speech = get_korean_font(12)
+    f_cutnum = get_korean_font(11)
+
+    # 상단 웹툰 타이틀 바
+    draw.rectangle([20, 20, img_w - 20, 70], fill=(15, 23, 42))
+    draw.text((35, 33), f"🎬 [4컷 웹툰] {article_title[:42]}...", fill=(255, 255, 255), font=f_maintitle)
+
+    margin = 20
+    top_offset = 90
+    panel_size = 375
+
+    positions = [
+        (margin, top_offset),
+        (img_w - margin - panel_size, top_offset),
+        (margin, top_offset + panel_size + margin),
+        (img_w - margin - panel_size, top_offset + panel_size + margin)
+    ]
+
+    for i in range(1, 5):
+        px, py = positions[i-1]
+        
+        panel_prompt = comic_data.get(f"cut{i}_prompt", f"webtoon panel {i}")
+        panel_img = fetch_ai_panel_image(panel_prompt, i-1)
+        time.sleep(1.0) # 서버 부하 차단 딜레이
+        
+        image.paste(panel_img, (px, py))
+        draw.rectangle([px, py, px + panel_size, py + panel_size], outline=(30, 41, 59), width=3)
+
+        # 컷 번호 뱃지
+        draw.rectangle([px + 10, py + 10, px + 45, py + 28], fill=(2, 132, 199))
+        draw.text((px + 15, py + 12), f"{i}컷", fill=(255, 255, 255), font=f_cutnum)
+
+        # 말풍선
+        speech_text = comic_data.get(f"cut{i}_speech", "")
+        sb_x1, sb_y1 = px + 12, py + panel_size - 75
+        sb_x2, sb_y2 = px + panel_size - 12, py + panel_size - 12
+        
+        draw.rounded_rectangle([sb_x1, sb_y1, sb_x2, sb_y2], radius=8, fill=(255, 255, 255), outline=(30, 41, 59), width=2)
+        draw_wrapped_text(draw, f"💬 {speech_text}", f_speech, (15, 23, 42), sb_x1 + 10, sb_y1 + 8, (sb_x2 - sb_x1) - 20)
+
+    draw.rectangle([0, 0, img_w - 1, img_h - 1], outline=(30, 41, 59), width=3)
+
+    buf = io.BytesIO()
+    image.save(buf, format="PNG")
+    buf.seek(0)
+    return buf
+
+# ---------------------------------------------------------
+# [형식 2] 포스터 생성 함수
+# ---------------------------------------------------------
+def generate_poster_data(title, desc, user_feedback, api_key):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={api_key}"
+    feedback_str = f"User Feedback: {user_feedback}" if user_feedback else ""
+    
+    prompt = f"""
+    Analyze this news article and create public campaign poster data in JSON format:
+    - News Title: {title}
+    - News Summary: {desc}
+    {feedback_str}
+
+    JSON structure:
+    {{
+      "image_prompt": "Highly detailed English image generation prompt for professional campaign poster illustration with striking visual symbols.",
+      "korean_catchphrase": "강렬하고 직관적인 한국어 핵심 한 줄 캐치프레이즈"
+    }}
+    """
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    data = json.dumps(payload).encode('utf-8')
+    req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+    try:
+        with urllib.request.urlopen(req) as response:
+            if response.getcode() == 200:
+                res_json = json.loads(response.read().decode('utf-8'))
+                raw_text = res_json['candidates'][0]['content']['parts'][0]['text']
+                clean_json = raw_text[raw_text.find("{"):raw_text.rfind("}")+1]
+                return json.loads(clean_json)
+    except Exception:
+        pass
+    return {
+        "image_prompt": f"Professional public campaign poster illustration about {title}",
+        "korean_catchphrase": title
+    }
+
+def create_poster_image(catchphrase, desc, image_prompt):
+    encoded_prompt = urllib.parse.quote(image_prompt)
+    ai_image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=700&height=550&nologo=true&enhance=true"
     
     try:
-        res = requests.get(ai_image_url, timeout=15)
+        res = requests.get(ai_image_url, timeout=25)
         ai_img = Image.open(io.BytesIO(res.content)).convert("RGB")
+        w, h = ai_img.size
+        ai_img = ai_img.crop((0, 0, w, h - 50))
+        ai_img = ai_img.resize((700, 500))
     except Exception:
-        ai_img = Image.new("RGB", (700, 550), color=(230, 235, 245))
+        ai_img = Image.new("RGB", (700, 500), color=(230, 235, 245))
 
-    poster_w, poster_h = 700, 950
+    poster_w, poster_h = 700, 900
     poster = Image.new("RGB", (poster_w, poster_h), color=(255, 255, 255))
     poster.paste(ai_img, (0, 0))
 
     draw = ImageDraw.Draw(poster)
-    draw.rectangle([0, 550, poster_w, poster_h], fill=(250, 250, 252))
-    draw.line([(0, 550), (poster_w, 550)], fill=(200, 205, 215), width=3)
+    draw.rectangle([0, 500, poster_w, poster_h], fill=(250, 250, 252))
+    draw.line([(0, 500), (poster_w, 500)], fill=(200, 205, 215), width=3)
 
     f_badge = get_korean_font(13)
     f_catch = get_korean_font(24)
     f_body = get_korean_font(14)
 
-    draw.text((40, 580), f"📌 [{content_format.upper()}] 핵심 메시지", fill=(2, 132, 199), font=f_badge)
-    draw_wrapped_text(draw, f"\"{title}\"", f_catch, (15, 23, 42), 40, 620, poster_w - 80, line_spacing=8)
-    draw_wrapped_text(draw, desc[:150] + "...", f_body, (100, 116, 139), 40, 770, poster_w - 80)
-    draw.text((40,
+    draw.text((40, 530), "📌 [포스터] 핵심 메시지", fill=(2, 132, 199), font=f_badge)
+    draw_wrapped_text(draw, f"\"{catchphrase}\"", f_catch, (15, 23, 42), 40, 570, poster_w - 80, line_spacing=8)
+    draw_wrapped_text(draw, desc[:150] + "...", f_body, (100, 116, 139), 40, 720, poster_w - 80)
+    draw.text((40, poster_h - 45), "FrameLens AI Media Production Studio", fill=(160, 170, 185), font=f_badge)
+    draw.rectangle([0, 0, poster_w - 1, poster_h - 1], outline=(30, 41, 59), width=3)
+
+    buf = io.BytesIO()
+    poster.save(buf, format="PNG")
+    buf.seek(0)
+    return buf
+
+# ---------------------------------------------------------
+# [형식 3] 인포그래픽 생성 함수
+# ---------------------------------------------------------
+def create_infographic_image(title, desc):
+    img_w, img_h = 800, 900
+    image = Image.new("RGB", (img_w, img_h), color=(240, 253, 244))
+    draw = ImageDraw.Draw(image)
+
+    f_title = get_korean_font(20)
+    f_sub = get_korean_font(14)
+    f_chart = get_korean_font(13)
+
+    draw.rectangle([25, 25, img_w - 25, 120], fill=(22, 101, 52))
+    draw.text((45, 40), "📊 [인포그래픽 통계 분석]", fill=(134, 239, 172), font=f_sub)
+    draw_wrapped_text(draw, title[:40], f_title, (255, 255, 255), 45, 68, img_w - 90)
+
+    gx, gy = 50, 160
+    draw.rectangle([gx, gy, gx + 330, gy + 320], fill=(255, 255, 255), outline=(187, 247, 208), width=2)
+    draw.text((gx + 20, gy + 15), "📈 주요 지표 및 순위 비교", fill=(20, 83, 45), font=f_sub)
+    
+    bars = [("1위 (핵심요인)", 260, (21, 128, 61)), 
+            ("2위 (영향력)", 200, (34, 197, 94)), 
+            ("3위 (발생률)", 140, (74, 222, 128)), 
+            ("4위 (기타)", 90, (134, 239, 172))]
+    
+    by = gy + 55
+    for label, b_len, b_color in bars:
+        draw.text((gx + 20, by), label, fill=(51, 65, 85), font=f_chart)
+        draw.rectangle([gx + 130, by + 4, gx + 130 + b_len, by + 22], fill=b_color)
+        by += 50
+
+    px, py = 410, 160
+    draw.rectangle([px, py, img_w - 50, py + 320], fill=(255, 255, 255), outline=(187, 247, 208), width=2)
+    draw.text((px + 20, py + 15), "🎯 비율 구성비 (분야별)", fill=(20, 83, 45), font=f_sub)
+    
+    circle_bbox = [px + 85, py + 70, px + 235, py + 220]
+    draw.pieslice(circle_bbox, start=0, end=220, fill=(21, 128, 61))
+    draw.pieslice(circle_bbox, start=220, end=330, fill=(74, 222, 128))
+    draw.pieslice(circle_bbox, start=330, end=360, fill=(187, 247, 208))
+    draw.ellipse([px + 120, py + 105, px + 200, py + 185], fill=(255, 255, 255))
+    draw.text((px + 138, py + 135), "TOTAL", fill=(22, 101, 52), font=f_sub)
+
+    hx, hy = 50, 510
+    draw.rectangle([hx, hy, img_w - 50, img_h - 50], fill=(255, 255, 255), outline=(187, 247, 208), width=2)
+    draw.text((hx + 20, hy + 20), "📝 [인포그래픽 종합 인사이트 및 요약]", fill=(20, 83, 45), font=f_sub)
+    draw_wrapped_text(draw, desc, f_chart, (51, 65, 85), hx + 20, hy + 60, img_w - 140, line_spacing=8)
+
+    buf = io.BytesIO()
+    image.save(buf, format="PNG")
+    buf.seek(0)
+    return buf
+
+# ---------------------------------------------------------
+# 화면 1: 초기 검색 창
+# ---------------------------------------------------------
+if st.session_state['step'] == 'search':
+    st.markdown('<div style="height: 60px;"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-title">FrameLens Studio</div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-subtitle">뉴스 기사를 선택하고 고품질 맞춤형 미디어 콘텐츠를 생성해 보세요!</div>', unsafe_allow_html=True)
+
+    with st.form(key="search_form"):
+        st.markdown('<div class="search-container">', unsafe_allow_html=True)
+        s_col1, s_col2 = st.columns([5, 1])
+        with s_col1:
+            keyword_input = st.text_input(
+                "뉴스 검색어 입력",
+                value="",
+                placeholder="검색어를 입력하세요 (예: 기후위기, 청소년 수면, AI 윤리, 딥페이크)",
+                label_visibility="collapsed"
+            )
+        with s_col2:
+            search_trigger = st.form_submit_button("검색", use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    if search_trigger:
+        if not keyword_input.strip():
+            st.warning("⚠️ 검색어를 입력해주세요!")
+        elif client_id and client_secret:
+            with st.spinner("뉴스를 불러오는 중입니다..."):
+                news_data = fetch_naver_news(keyword_input)
+                st.session_state['news_pool'] = news_data
+                st.session_state['last_query'] = keyword_input.strip()
+                st.session_state['page_number'] = 1
+                st.session_state['step'] = 'result'
+                st.rerun()
+
+# ---------------------------------------------------------
+# 화면 2: 뉴스 기사 선택 및 대화형 이미지 생성 화면
+# ---------------------------------------------------------
+elif st.session_state['step'] == 'result':
+    top_col1, top_col2 = st.columns([4, 1])
+    with top_col1:
+        st.markdown(f"## FrameLens | '{st.session_state.get('last_query', '')}' 뉴스 탐색")
+    with top_col2:
+        if st.button("← 다시 검색하기", use_container_width=True):
+            st.session_state['step'] = 'search'
+            st.rerun()
+
+    st.markdown("---")
+
+    all_news = st.session_state.get('news_pool', [])
+    total_news_count = len(all_news)
+
+    if total_news_count == 0:
+        st.warning("검색 결과가 없습니다. 다른 검색어로 다시 시도해보세요.")
+    else:
+        items_per_page = 10
+        total_pages = max(1, (total_news_count + items_per_page - 1) // items_per_page)
+        
+        current_page = st.session_state['page_number']
+        start_idx = (current_page - 1) * items_per_page
+        end_idx = start_idx + items_per_page
+        current_news_batch = all_news[start_idx:end_idx]
+
+        left_col, right_col = st.columns([1.2, 1])
+
+        with left_col:
+            st.markdown(f"### 최신 뉴스 목록 ({total_news_count}건)")
+            st.caption(f"최신순 정렬 (페이지 {current_page} / {total_pages})")
+
+            article_options = {}
+            for idx, item in enumerate(current_news_batch):
+                clean_title = item.get('title', '').replace("<b>", "").replace("</b>", "").replace("&quot;", '"').replace("&amp;", "&")
+                clean_desc = item.get('description', '').replace("<b>", "").replace("</b>", "").replace("&quot;", '"').replace("&amp;", "&")
+                link = item.get('originallink', item.get('link', '#'))
+                pub_date = parse_pub_date(item.get('pubDate', ''))
+                
+                label = f"[{pub_date}] {clean_title}"
+                article_options[label] = {"title": clean_title, "link": link, "desc": clean_desc, "date": pub_date}
+
+            selected_label = st.radio(
+                "기사 선택",
+                options=list(article_options.keys()),
+                key=f"radio_page_{current_page}",
+                label_visibility="collapsed"
+            )
+
+            p_col1, p_col2, p_col3 = st.columns([1, 2, 1])
+            with p_col1:
+                if current_page > 1:
+                    if st.button("◀ 이전 페이지", use_container_width=True):
+                        st.session_state['page_number'] -= 1
+                        st.rerun()
+            with p_col2:
+                st.markdown(f"<div style='text-align: center; padding-top: 10px; color: #94a3b8;'>{current_page} / {total_pages} Page</div>", unsafe_allow_html=True)
+            with p_col3:
+                if current_page < total_pages:
+                    if st.button("다음 페이지 ▶", use_container_width=True):
+                        st.session_state['page_number'] += 1
+                        st.rerun()
+
+        with right_col:
+            st.markdown("### 기획할 미디어 콘텐츠 유형 선택")
+            
+            content_format = st.selectbox(
+                "형식 선택",
+                [
+                    "포스터",
+                    "만화 (컷툰/웹툰)",
+                    "인포그래픽"
+                ],
+                label_visibility="collapsed"
+            )
+
+            if selected_label in article_options:
+                selected_art = article_options[selected_label]
+                st.markdown('<div class="right-card-box">', unsafe_allow_html=True)
+                st.markdown(f"**선택된 뉴스 기사**")
+                st.write(f"📌 {selected_art['title']}")
+                st.caption(f"발행일: {selected_art['date']}")
+                st.markdown(f"[원문 기사 읽기]({selected_art['link']})")
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            current_article_key = f"{selected_label}_{content_format}"
+            if 'last_art_key' not in st.session_state or st.session_state['last_art_key'] != current_article_key:
+                st.session_state.pop('image_bytes', None)
+                st.session_state['last_art_key'] = current_article_key
+
+            submit_plan = st.button("기사 맞춤형 콘텐츠 생성하기", use_container_width=True)
+
+            if submit_plan:
+                if not gemini_key:
+                    st.error("❌ 사이드바에 API Key를 입력해 주세요!")
+                elif selected_label not in article_options:
+                    st.warning("⚠️ 선택된 뉴스 기사 정보를 찾을 수 없습니다.")
+                else:
+                    selected_article = article_options[selected_label]
+                    
+                    with st.spinner("🔄 고품질 4컷 웹툰 및 일러스트를 렌더링 중입니다... (예상 소요 시간: 약 15~20초)"):
+                        if content_format == "만화 (컷툰/웹툰)":
+                            comic_data = generate_comic_scenario(selected_article['title'], selected_article['desc'], "", gemini_key)
+                            st.session_state['comic_data'] = comic_data
+                            image_bytes = create_4cut_comic_image(comic_data, selected_article['title'])
+                        elif content_format == "포스터":
+                            poster_data = generate_poster_data(selected_article['title'], selected_article['desc'], "", gemini_key)
+                            st.session_state['poster_data'] = poster_data
+                            image_bytes = create_poster_image(poster_data['korean_catchphrase'], selected_article['desc'], poster_data['image_prompt'])
+                        else:
+                            image_bytes = create_infographic_image(selected_article['title'], selected_article['desc'])
+                        
+                        st.session_state['selected_article'] = selected_article
+                        st.session_state['content_format'] = content_format
+                        st.session_state['image_bytes'] = image_bytes
+
+            if 'image_bytes' in st.session_state and st.session_state['image_bytes']:
+                st.markdown('<div class="image-preview-container">', unsafe_allow_html=True)
+                st.markdown(f"### 🎬 [{st.session_state['content_format']}] 생성된 맞춤형 결과물")
+                art = st.session_state['selected_article']
+                st.markdown(f"**기반 뉴스**: [{art['title']}]({art['link']})")
+                st.markdown("---")
+                
+                st.image(st.session_state['image_bytes'], use_container_width=True, caption=f"{art['title']} - {st.session_state['content_format']}")
+                
+                st.markdown("---")
+                st.markdown("#### 💬 AI에게 물어보기")
+                
+                user_feedback = st.text_input(
+                    "수정 요청 사항",
+                    value="",
+                    placeholder="수정하고 싶은 내용을 입력하세요...",
+                    label_visibility="collapsed"
+                )
+                
+                col_ref, col_down = st.columns([1, 1])
+                with col_ref:
+                    if st.button("🔄 피드백 반영하여 다시 생성하기", use_container_width=True):
+                        if user_feedback.strip():
+                            with st.spinner("🔄 AI가 수정 요청을 반영하여 콘텐츠를 다시 다듬고 있습니다... (예상 소요 시간: 약 15~20초)"):
+                                if st.session_state['content_format'] == "만화 (컷툰/웹툰)":
+                                    comic_data = generate_comic_scenario(art['title'], art['desc'], user_feedback, gemini_key)
+                                    image_bytes = create_4cut_comic_image(comic_data, art['title'])
+                                elif st.session_state['content_format'] == "포스터":
+                                    poster_data = generate_poster_data(art['title'], art['desc'], user_feedback, gemini_key)
+                                    image_bytes = create_poster_image(poster_data['korean_catchphrase'], art['desc'], poster_data['image_prompt'])
+                                else:
+                                    image_bytes = create_infographic_image(art['title'], art['desc'])
+                                
+                                st.session_state['image_bytes'] = image_bytes
+                                st.rerun()
+                        else:
+                            st.warning("⚠️ 수정하고 싶은 내용을 입력해 주세요!")
+                with col_down:
+                    st.download_button(
+                        label="📥 최종 이미지 다운로드 (PNG)",
+                        data=st.session_state['image_bytes'],
+                        file_name=f"FrameLens_{st.session_state['content_format'].replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
+                        mime="image/png",
+                        use_container_width=True
+                    )
+                st.markdown('</div>', unsafe_allow_html=True)
