@@ -84,7 +84,7 @@ st.markdown("""
         text-shadow: 2px 2px 0px #000000;
     }
 
-    /* 💡 [수정] 뉴스 요약 본문이 잘리지 않고 전체 다 보이도록 높이 제한 해제 */
+    /* 뉴스 기사 내용 표시 박스 */
     .in-app-news-reader {
         background: #18181b;
         border: 3px solid #f59e0b;
@@ -117,28 +117,25 @@ st.markdown("""
         background: #09090b;
         padding: 14px;
         border-left: 4px solid #f59e0b;
-        margin-bottom: 14px;
-        height: auto !important; /* 높이 제한 해제 */
-        max-height: none !important; /* 최대 높이 제한 해제 */
+        max-height: 200px;
+        overflow-y: auto;  
+        margin-bottom: 12px;
+        white-space: pre-wrap;
     }
     .news-link-btn {
-        display: block;
-        text-align: center;
+        display: inline-block;
         font-family: 'Galmuri11', monospace !important;
-        color: #000000 !important;
-        font-size: 1rem;
-        font-weight: 900;
+        color: #facc15 !important;
+        font-size: 0.88rem;
+        font-weight: 700;
         text-decoration: none;
-        border: 2px solid #fef08a;
-        padding: 12px;
-        background: #facc15;
-        box-shadow: 3px 3px 0px #000000;
-        transition: all 0.1s ease;
+        border: 1px solid #facc15;
+        padding: 5px 12px;
+        background: #27272a;
     }
     .news-link-btn:hover {
-        background: #eab308;
-        transform: translate(-1px, -1px);
-        box-shadow: 4px 4px 0px #000000;
+        background: #facc15;
+        color: #000000 !important;
     }
 
     /* 레트로 아케이드 버튼 스타일 */
@@ -245,24 +242,26 @@ def fetch_random_naver_news():
 def generate_mafia_game(title, desc, api_key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={api_key}"
     prompt = f"""
-    뉴스 내용 스파이 찾기 게임 진행자 역할을 수행한다. 다음 실제 네이버 뉴스 정보를 바탕으로 게임을 구성한다.
+    뉴스 내용 스파이 찾기 게임 진행자 역할을 수행한다. 다음 실제 뉴스 기사 요약 정보를 바탕으로 게임을 풍성하게 구성한다.
     - 뉴스 제목: {title}
     - 뉴스 요약 내용: {desc}
 
-    4명의 AI 용의자 플레이어(김시민, 박기자, 최학자, 이스파이)가 존재한다.
-    이 중 한 명은 스파이이며, 뉴스 내용을 거짓으로 주장하거나 왜곡된 발언을 한다.
+    지시사항:
+    1. 위 뉴스 정보를 바탕으로 플레이어가 게임을 원활히 즐길 수 있도록 **상세하고 풍성한 본문 내용(news_body)**을 3~4문단 분량으로 확장해서 작성해라.
+    2. 4명의 AI 용의자 플레이어(김시민, 박기자, 최학자, 이스파이)가 존재한다. 이 중 한 명은 스파이며, 뉴스 내용을 왜곡하거나 거짓 발언을 한다.
 
     반드시 아래 JSON 형식으로만 답변한다:
     {{
+      "news_body": "여기에 확장된 상세 뉴스 본문 내용을 작성한다.",
       "players": [
-        {{"name": "김시민", "role": "시민", "statement": "진짜 기사 관련 1번 증언"}},
-        {{"name": "박기자", "role": "시민", "statement": "진짜 기사 관련 2번 증언"}},
-        {{"name": "최학자", "role": "시민", "statement": "진짜 기사 관련 3번 증언"}},
+        {{"name": "김시민", "role": "시민", "statement": "진짜 기사 내용에 기반한 1번 증언"}},
+        {{"name": "박기자", "role": "시민", "statement": "진짜 기사 내용에 기반한 2번 증언"}},
+        {{"name": "최학자", "role": "시민", "statement": "진짜 기사 내용에 기반한 3번 증언"}},
         {{"name": "이스파이", "role": "스파이", "statement": "교묘하게 왜곡된 가짜 뉴스 증언"}}
       ],
       "spy_index": 3,
       "defense": "스파이가 최후의 변론으로 하는 변명",
-      "fact_check": "진짜 뉴스 팩트체크 해설"
+      "fact_check": "진짜 뉴스 본문에 따른 팩트체크 해설"
     }}
     """
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
@@ -283,10 +282,11 @@ def generate_mafia_game(title, desc, api_key):
     except Exception:
         pass
     return {
+        "news_body": f"최근 보도된 '{title}'와 관련하여 사회 각계의 다양한 의견이 대립하고 있다. 이번 사건은 향후 관련 정책 및 동향에 적지 않은 영향을 미칠 것으로 보이며, 철저한 사실 확인과 다각도의 분석이 요구되고 있다.",
         "players": [
             {"name": "김시민", "role": "시민", "statement": f"이번 기사는 {title[:15]} 관련 사건이 확실하다."},
-            {"name": "박기자", "role": "시민", "statement": f"보도된 바에 따르면 {desc[:25]} 내용이다."},
-            {"name": "최학자", "role": "시민", "statement": "전문가 분석 결과도 기사 본문과 동일하다."},
+            {"name": "박기자", "role": "시민", "statement": "보도된 바에 따르면 해당 사안은 철저한 분석이 필요하다."},
+            {"name": "최학자", "role": "시민", "statement": "전문가들도 기사 내용과 동일한 입장을 밝혔다."},
             {"name": "이스파이", "role": "스파이", "statement": "사실 이번 기사는 전부 거짓이며 외계인이 개입했다!"}
         ],
         "spy_index": 3,
@@ -394,8 +394,8 @@ else:
                     실시간 뉴스 증언 분석 및 가짜 뉴스 판별 추리 모드
                 </div>
                 <div style="color: #e4e4e7; text-align: left; line-height: 1.8; font-size: 1.05rem; max-width: 650px; margin: 0 auto 30px auto;">
-                    1. 버튼을 누르면 실제 네이버 뉴스 기사와 4명의 AI 용의자가 소집된다.<br>
-                    2. 용의자들의 증언과 네이버 원문을 확인한다.<br>
+                    1. 버튼을 누르면 실시간 뉴스 기사와 4명의 AI 용의자가 소집된다.<br>
+                    2. 용의자들의 증언을 메신저 대화로 확인한다.<br>
                     3. 교묘하게 왜곡된 가짜 뉴스를 퍼트린 스파이를 찾아 지목한다.
                 </div>
             </div>
@@ -405,7 +405,7 @@ else:
                 if not gemini_key or not client_id:
                     st.error("API Key가 설정되지 않았다!")
                 else:
-                    with st.spinner("실시간 네이버 뉴스 소집 중..."):
+                    with st.spinner("실시간 뉴스 소집 및 분석 중..."):
                         random_item = fetch_random_naver_news()
                         if random_item:
                             t = random_item.get('title', '').replace("<b>", "").replace("</b>", "").replace("&quot;", '"').replace("&amp;", "&")
@@ -414,7 +414,6 @@ else:
                             
                             g_data = generate_mafia_game(t, d, gemini_key)
                             g_data['title'] = t
-                            g_data['desc'] = d
                             g_data['link'] = l
                             st.session_state['mafia_game_data'] = g_data
                             
@@ -428,16 +427,16 @@ else:
         elif st.session_state['mafia_phase'] == 'debate':
             g = st.session_state['mafia_game_data']
             news_link = g.get('link', '#')
-            news_desc = g.get('desc', '')
+            news_body = g.get('news_body', '')
             
-            # 💡 높이 제한이 풀린 뉴스 브리핑 박스
+            # 💡 실제 뉴스 기반 풍성한 본문과 원문 링크 출력
             st.markdown(f"""
             <div class="in-app-news-reader">
-                <div class="news-reader-header">> BRIEFING: 실시간 네이버 뉴스 출제 요약</div>
+                <div class="news-reader-header">> BRIEFING: 실시간 출제 뉴스 브리핑</div>
                 <div class="news-reader-title">{g['title']}</div>
-                <div class="news-reader-body">{news_desc}</div>
-                <div>
-                    <a href="{news_link}" target="_blank" class="news-link-btn">🔗 네이버 원문 기사 전체 전문 읽기 (새창 열기)</a>
+                <div class="news-reader-body">{news_body}</div>
+                <div style="text-align: right;">
+                    <a href="{news_link}" target="_blank" class="news-link-btn">🔗 네이버 원문 기사 전체 읽기 ➔</a>
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -540,7 +539,7 @@ else:
             st.markdown('<div style="padding: 5px;">', unsafe_allow_html=True)
             for chat in st.session_state['kung_history']:
                 text = chat.get('text', '')
-                if chat.get('role'] == 'ai':
+                if chat.get('role') == 'ai':
                     st.markdown(f"""
                     <div style="display: flex; justify-content: flex-start; margin-bottom: 12px;">
                         <div>
