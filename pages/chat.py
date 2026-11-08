@@ -84,14 +84,14 @@ st.markdown("""
         text-shadow: 2px 2px 0px #000000;
     }
 
-    /* 인게임 뉴스 브리핑 박스 */
+    /* 💡 [수정] 뉴스 기사 전문 및 원문 링크 전체 표시 브리핑 박스 */
     .in-app-news-reader {
         background: #18181b;
         border: 3px solid #f59e0b;
         border-radius: 0px;
-        padding: 16px 20px;
+        padding: 18px 20px;
         max-width: 850px;
-        margin: 0 auto 10px auto;
+        margin: 0 auto 12px auto;
         box-shadow: 4px 4px 0px #000000;
     }
     .news-reader-header {
@@ -106,19 +106,35 @@ st.markdown("""
         font-size: 1.15rem;
         font-weight: 700;
         color: #ffffff;
-        margin-bottom: 6px;
+        margin-bottom: 8px;
         line-height: 1.4;
     }
     .news-reader-body {
         font-family: 'Galmuri11', monospace !important;
-        font-size: 0.92rem;
+        font-size: 0.95rem;
         color: #e4e4e7;
-        line-height: 1.4;
+        line-height: 1.6;
         background: #09090b;
-        padding: 10px;
+        padding: 12px;
         border-left: 4px solid #f59e0b;
-        max-height: 75px;
-        overflow-y: auto;
+        max-height: 160px; /* 전문을 충분히 읽을 수 있도록 높이 확대 */
+        overflow-y: auto;  /* 긴 기사의 경우 전체 스크롤해서 확인 가능 */
+        margin-bottom: 10px;
+    }
+    .news-link-btn {
+        display: inline-block;
+        font-family: 'Galmuri11', monospace !important;
+        color: #facc15 !important;
+        font-size: 0.88rem;
+        font-weight: 700;
+        text-decoration: none;
+        border: 1px solid #facc15;
+        padding: 4px 10px;
+        background: #27272a;
+    }
+    .news-link-btn:hover {
+        background: #facc15;
+        color: #000000 !important;
     }
 
     /* 레트로 아케이드 버튼 스타일 */
@@ -142,25 +158,24 @@ st.markdown("""
         box-shadow: 4px 4px 0px #000000 !important;
     }
 
-    /* 💡 메신저 및 설명 박스 상단 회색 바 (CHATTING ROOM / EXPLANATION 공용) */
+    /* 메신저 상단 바 및 설명 박스 */
     .messenger-top-bar {
         background: #27272a;
         border: 2px solid #52525b;
         border-bottom: none;
-        padding: 10px 20px;
+        padding: 8px 16px;
         max-width: 850px;
         margin: 0 auto;
     }
     .messenger-top-title {
         font-family: 'Galmuri11', monospace !important;
         color: #facc15;
-        font-size: 1.05rem;
+        font-size: 1rem;
         font-weight: 700;
         text-align: center;
         letter-spacing: 2px;
     }
 
-    /* 💡 게임 설명 박스 컨테이너 */
     .explanation-room {
         background: #18181b;
         border: 2px solid #52525b;
@@ -169,17 +184,6 @@ st.markdown("""
         max-width: 850px;
         margin: 0 auto 20px auto;
         box-shadow: 4px 4px 0px #000000;
-    }
-
-    .messenger-room {
-        background: #18181b;
-        border: 2px solid #52525b;
-        border-top: none;
-        padding: 15px 20px;
-        max-width: 850px;
-        margin: 0 auto 15px auto;
-        height: 290px;
-        overflow-y: auto;
     }
 
     h1, h2, h3, h4, label, p, span, div {
@@ -239,7 +243,7 @@ def generate_mafia_game(title, desc, api_key):
     prompt = f"""
     뉴스 내용 스파이 찾기 게임 진행자 역할을 수행한다. 다음 뉴스 기사를 바탕으로 게임을 구성한다.
     - 뉴스 제목: {title}
-    - 뉴스 요약: {desc}
+    - 뉴스 내용: {desc}
 
     4명의 AI 용의자 플레이어(김시민, 박기자, 최학자, 이스파이)가 존재한다.
     이 중 한 명은 스파이이며, 뉴스 내용을 거짓으로 주장하거나 왜곡된 발언을 한다.
@@ -376,7 +380,6 @@ else:
     # [뉴스 내용 스파이 찾기 게임 모드]
     if st.session_state['active_chat_game'] == "mafia":
         if st.session_state['mafia_phase'] == 'init':
-            # 💡 [수정] 게임 시작 전 안내문을 회색 상단 바 + 설명 박스 레이아웃으로 감쌈
             st.markdown("""
             <div class="messenger-top-bar">
                 <div class="messenger-top-title">EXPLANATION (게임 설명)</div>
@@ -420,13 +423,17 @@ else:
 
         elif st.session_state['mafia_phase'] == 'debate':
             g = st.session_state['mafia_game_data']
+            news_link = g.get('link', '#')
             
-            # 상단 뉴스 브리핑 박스
+            # 💡 [핵심 수정] 뉴스 기사 전문 스크롤 제공 및 원문 링크 버튼 추가
             st.markdown(f"""
             <div class="in-app-news-reader">
-                <div class="news-reader-header">> BRIEFING: 실시간 출제 뉴스</div>
+                <div class="news-reader-header">> BRIEFING: 실시간 출제 뉴스 전문</div>
                 <div class="news-reader-title">{g['title']}</div>
                 <div class="news-reader-body">{g['desc']}</div>
+                <div style="text-align: right;">
+                    <a href="{news_link}" target="_blank" class="news-link-btn">🔗 네이버 원문 기사 전체 읽기 ➔</a>
+                </div>
             </div>
             """, unsafe_allow_html=True)
 
