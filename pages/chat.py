@@ -171,39 +171,6 @@ st.markdown("""
         overflow-y: auto;
     }
 
-    .msg-row-left { display: flex; justify-content: flex-start; margin-bottom: 14px; }
-    .msg-row-right { display: flex; justify-content: flex-end; margin-bottom: 14px; }
-    
-    .msg-bubble-left {
-        font-family: 'Galmuri11', monospace !important;
-        background-color: #27272a;
-        color: #f4f4f5;
-        padding: 10px 14px;
-        border: 1px solid #52525b;
-        border-radius: 0px;
-        max-width: 85%;
-        font-size: 0.98rem;
-        line-height: 1.5;
-    }
-    .msg-bubble-right {
-        font-family: 'Galmuri11', monospace !important;
-        background-color: #ca8a04;
-        color: #ffffff;
-        padding: 10px 14px;
-        border: 1px solid #fef08a;
-        border-radius: 0px;
-        max-width: 85%;
-        font-size: 0.98rem;
-        line-height: 1.5;
-    }
-    .msg-sender { 
-        font-family: 'Galmuri11', monospace !important;
-        font-size: 0.85rem; 
-        color: #facc15; 
-        margin-bottom: 4px; 
-        font-weight: 700;
-    }
-
     h1, h2, h3, h4, label, p, span, div {
         font-family: 'Galmuri11', monospace !important;
     }
@@ -455,15 +422,17 @@ else:
             </div>
             """, unsafe_allow_html=True)
 
-            # 💡 수정된 부분: CHATTING ROOM 박스 태그 내부에 위젯이 아닌 순수 HTML(st.markdown)로 메시지들을 반복 렌더링하여 박스 안에 완전히 가두기
+            # 💡 안전한 렌더링을 위해 텍스트 필드 검증 추가
             chats_html = ""
             for chat in st.session_state['messenger_chats']:
-                if chat['sender'] == "태희 (나)":
+                sender = chat.get('sender', '알 수 없음')
+                text = chat.get('text', '')
+                if chat.get('sender') == "태희 (나)":
                     chats_html += f"""
                     <div style="display: flex; justify-content: flex-end; margin-bottom: 14px;">
                         <div>
-                            <div style="font-family: 'Galmuri11', monospace; font-size: 0.85rem; color: #ffffff; text-align: right; margin-bottom: 4px; font-weight: 700;">{chat['sender']}</div>
-                            <div style="font-family: 'Galmuri11', monospace; background-color: #ca8a04; color: #ffffff; padding: 10px 14px; border: 1px solid #fef08a; border-radius: 0px; max-width: 100%; font-size: 0.98rem; line-height: 1.5;">{chat['text']}</div>
+                            <div style="font-family: 'Galmuri11', monospace; font-size: 0.85rem; color: #ffffff; text-align: right; margin-bottom: 4px; font-weight: 700;">{sender}</div>
+                            <div style="font-family: 'Galmuri11', monospace; background-color: #ca8a04; color: #ffffff; padding: 10px 14px; border: 1px solid #fef08a; border-radius: 0px; max-width: 100%; font-size: 0.98rem; line-height: 1.5;">{text}</div>
                         </div>
                     </div>
                     """
@@ -471,8 +440,8 @@ else:
                     chats_html += f"""
                     <div style="display: flex; justify-content: flex-start; margin-bottom: 14px;">
                         <div>
-                            <div style="font-family: 'Galmuri11', monospace; font-size: 0.85rem; color: #facc15; margin-bottom: 4px; font-weight: 700;">{chat['sender']}</div>
-                            <div style="font-family: 'Galmuri11', monospace; background-color: #27272a; color: #f4f4f5; padding: 10px 14px; border: 1px solid #52525b; border-radius: 0px; max-width: 100%; font-size: 0.98rem; line-height: 1.5;">{chat['text']}</div>
+                            <div style="font-family: 'Galmuri11', monospace; font-size: 0.85rem; color: #facc15; margin-bottom: 4px; font-weight: 700;">{sender}</div>
+                            <div style="font-family: 'Galmuri11', monospace; background-color: #27272a; color: #f4f4f5; padding: 10px 14px; border: 1px solid #52525b; border-radius: 0px; max-width: 100%; font-size: 0.98rem; line-height: 1.5;">{text}</div>
                         </div>
                     </div>
                     """
@@ -545,12 +514,13 @@ else:
 
         kung_html = ""
         for chat in st.session_state['kung_history']:
-            if chat['role'] == 'ai':
+            text = chat.get('text', '')
+            if chat.get('role') == 'ai':
                 kung_html += f"""
                 <div style="display: flex; justify-content: flex-start; margin-bottom: 14px;">
                     <div>
                         <div style="font-family: 'Galmuri11', monospace; font-size: 0.85rem; color: #facc15; margin-bottom: 4px; font-weight: 700;">AI SHOW HOST</div>
-                        <div style="font-family: 'Galmuri11', monospace; background-color: #27272a; color: #f4f4f5; padding: 10px 14px; border: 1px solid #52525b; border-radius: 0px; max-width: 100%; font-size: 0.98rem; line-height: 1.5;">{chat['text']}</div>
+                        <div style="font-family: 'Galmuri11', monospace; background-color: #27272a; color: #f4f4f5; padding: 10px 14px; border: 1px solid #52525b; border-radius: 0px; max-width: 100%; font-size: 0.98rem; line-height: 1.5;">{text}</div>
                     </div>
                 </div>
                 """
@@ -559,7 +529,7 @@ else:
                 <div style="display: flex; justify-content: flex-end; margin-bottom: 14px;">
                     <div>
                         <div style="font-family: 'Galmuri11', monospace; font-size: 0.85rem; color: #ffffff; text-align: right; margin-bottom: 4px; font-weight: 700;">태희 (나)</div>
-                        <div style="font-family: 'Galmuri11', monospace; background-color: #ca8a04; color: #ffffff; padding: 10px 14px; border: 1px solid #fef08a; border-radius: 0px; max-width: 100%; font-size: 0.98rem; line-height: 1.5;">{chat['text']}</div>
+                        <div style="font-family: 'Galmuri11', monospace; background-color: #ca8a04; color: #ffffff; padding: 10px 14px; border: 1px solid #fef08a; border-radius: 0px; max-width: 100%; font-size: 0.98rem; line-height: 1.5;">{text}</div>
                     </div>
                 </div>
                 """
@@ -584,9 +554,9 @@ else:
                 res = get_kung_reply(user_word.strip(), last_w, gemini_key)
                 
                 st.session_state['kung_history'].append({"role": "user", "text": user_word.strip()})
-                st.session_state['kung_history'].append({"role": "ai", "text": res['reply_text']})
+                st.session_state['kung_history'].append({"role": "ai", "text": res.get('reply_text', '')})
                 
-                if res['status'] == 'success':
+                if res.get('status') == 'success':
                     st.session_state['total_score'] += 10
-                    st.session_state['kung_current_word'] = res['next_word']
+                    st.session_state['kung_current_word'] = res.get('next_word', last_w)
                 st.rerun()
