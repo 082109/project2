@@ -91,7 +91,7 @@ st.markdown("""
         border-radius: 0px;
         padding: 18px 20px;
         max-width: 850px;
-        margin: 0 auto 15px auto;
+        margin: 0 auto 12px auto;
         box-shadow: 4px 4px 0px #000000;
     }
     .news-reader-header {
@@ -117,7 +117,7 @@ st.markdown("""
         background: #09090b;
         padding: 12px;
         border-left: 4px solid #f59e0b;
-        max-height: 100px;
+        max-height: 90px;
         overflow-y: auto;
     }
 
@@ -142,25 +142,24 @@ st.markdown("""
         box-shadow: 4px 4px 0px #000000 !important;
     }
 
-    /* 메신저 영역 (CHATTING ROOM) */
+    /* 메신저 상단 바 및 채팅방 내부 영역 */
     .messenger-top-bar {
         background: #27272a;
         border: 2px solid #52525b;
         border-bottom: none;
-        padding: 10px 20px;
+        padding: 8px 16px;
         max-width: 850px;
         margin: 0 auto;
     }
     .messenger-top-title {
         font-family: 'Galmuri11', monospace !important;
         color: #facc15;
-        font-size: 1.05rem;
+        font-size: 1rem;
         font-weight: 700;
         text-align: center;
         letter-spacing: 2px;
     }
 
-    /* 💡 용의자 대화가 표시되는 CHATTING ROOM 레이아웃 박스 */
     .messenger-room {
         background: #18181b;
         border: 2px solid #52525b;
@@ -168,21 +167,21 @@ st.markdown("""
         padding: 20px;
         max-width: 850px;
         margin: 0 auto 15px auto;
-        height: 320px;
+        height: 340px;
         overflow-y: auto;
     }
 
-    .msg-row-left { display: flex; justify-content: flex-start; margin-bottom: 12px; }
-    .msg-row-right { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+    .msg-row-left { display: flex; justify-content: flex-start; margin-bottom: 14px; }
+    .msg-row-right { display: flex; justify-content: flex-end; margin-bottom: 14px; }
     
     .msg-bubble-left {
         font-family: 'Galmuri11', monospace !important;
         background-color: #27272a;
         color: #f4f4f5;
-        padding: 8px 14px;
+        padding: 10px 14px;
         border: 1px solid #52525b;
         border-radius: 0px;
-        max-width: 80%;
+        max-width: 85%;
         font-size: 0.98rem;
         line-height: 1.5;
     }
@@ -190,10 +189,10 @@ st.markdown("""
         font-family: 'Galmuri11', monospace !important;
         background-color: #ca8a04;
         color: #ffffff;
-        padding: 8px 14px;
+        padding: 10px 14px;
         border: 1px solid #fef08a;
         border-radius: 0px;
-        max-width: 80%;
+        max-width: 85%;
         font-size: 0.98rem;
         line-height: 1.5;
     }
@@ -201,7 +200,7 @@ st.markdown("""
         font-family: 'Galmuri11', monospace !important;
         font-size: 0.85rem; 
         color: #facc15; 
-        margin-bottom: 3px; 
+        margin-bottom: 4px; 
         font-weight: 700;
     }
 
@@ -429,7 +428,6 @@ else:
                             g_data['link'] = l
                             st.session_state['mafia_game_data'] = g_data
                             
-                            # 💡 용의자 4명의 증언 대화를 CHATTING ROOM 레이아웃으로 직행하도록 초기화
                             chats = []
                             for idx, p in enumerate(g_data['players']):
                                 chats.append({"sender": f"{idx+1}번 용의자 [{p['name']}]", "text": p['statement']})
@@ -450,35 +448,40 @@ else:
             </div>
             """, unsafe_allow_html=True)
 
-            # CHATTING ROOM 상단바
+            # CHATTING ROOM 상단 바
             st.markdown("""
             <div class="messenger-top-bar">
                 <div class="messenger-top-title">CHATTING ROOM (용의자 증언 대화창)</div>
             </div>
             """, unsafe_allow_html=True)
 
-            # 💡 CHATTING ROOM 레이아웃 박스 내에 용의자 4명 증언 & 사용자 메시지 출력
-            st.markdown('<div class="messenger-room">', unsafe_allow_html=True)
+            # 💡 수정된 부분: CHATTING ROOM 박스 태그 내부에 위젯이 아닌 순수 HTML(st.markdown)로 메시지들을 반복 렌더링하여 박스 안에 완전히 가두기
+            chats_html = ""
             for chat in st.session_state['messenger_chats']:
                 if chat['sender'] == "태희 (나)":
-                    st.markdown(f"""
-                    <div class="msg-row-right">
+                    chats_html += f"""
+                    <div style="display: flex; justify-content: flex-end; margin-bottom: 14px;">
                         <div>
-                            <div class="msg-sender" style="text-align:right; color:#ffffff;">{chat['sender']}</div>
-                            <div class="msg-bubble-right">{chat['text']}</div>
+                            <div style="font-family: 'Galmuri11', monospace; font-size: 0.85rem; color: #ffffff; text-align: right; margin-bottom: 4px; font-weight: 700;">{chat['sender']}</div>
+                            <div style="font-family: 'Galmuri11', monospace; background-color: #ca8a04; color: #ffffff; padding: 10px 14px; border: 1px solid #fef08a; border-radius: 0px; max-width: 100%; font-size: 0.98rem; line-height: 1.5;">{chat['text']}</div>
                         </div>
                     </div>
-                    """, unsafe_allow_html=True)
+                    """
                 else:
-                    st.markdown(f"""
-                    <div class="msg-row-left">
+                    chats_html += f"""
+                    <div style="display: flex; justify-content: flex-start; margin-bottom: 14px;">
                         <div>
-                            <div class="msg-sender">{chat['sender']}</div>
-                            <div class="msg-bubble-left">{chat['text']}</div>
+                            <div style="font-family: 'Galmuri11', monospace; font-size: 0.85rem; color: #facc15; margin-bottom: 4px; font-weight: 700;">{chat['sender']}</div>
+                            <div style="font-family: 'Galmuri11', monospace; background-color: #27272a; color: #f4f4f5; padding: 10px 14px; border: 1px solid #52525b; border-radius: 0px; max-width: 100%; font-size: 0.98rem; line-height: 1.5;">{chat['text']}</div>
                         </div>
                     </div>
-                    """, unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+                    """
+
+            st.markdown(f"""
+            <div class="messenger-room">
+                {chats_html}
+            </div>
+            """, unsafe_allow_html=True)
 
             with st.form(key="msg_form", clear_on_submit=True):
                 user_msg = st.text_input("메시지 입력", placeholder="예: 3번 진술이 이상하다. 거짓말 같다.")
@@ -540,27 +543,32 @@ else:
         </div>
         """, unsafe_allow_html=True)
 
-        st.markdown('<div class="messenger-room" style="height:350px;">', unsafe_allow_html=True)
+        kung_html = ""
         for chat in st.session_state['kung_history']:
             if chat['role'] == 'ai':
-                st.markdown(f"""
-                <div class="msg-row-left">
+                kung_html += f"""
+                <div style="display: flex; justify-content: flex-start; margin-bottom: 14px;">
                     <div>
-                        <div class="msg-sender" style="color:#facc15;">AI SHOW HOST</div>
-                        <div class="msg-bubble-left">{chat['text']}</div>
+                        <div style="font-family: 'Galmuri11', monospace; font-size: 0.85rem; color: #facc15; margin-bottom: 4px; font-weight: 700;">AI SHOW HOST</div>
+                        <div style="font-family: 'Galmuri11', monospace; background-color: #27272a; color: #f4f4f5; padding: 10px 14px; border: 1px solid #52525b; border-radius: 0px; max-width: 100%; font-size: 0.98rem; line-height: 1.5;">{chat['text']}</div>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
+                """
             else:
-                st.markdown(f"""
-                <div class="msg-row-right">
+                kung_html += f"""
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 14px;">
                     <div>
-                        <div class="msg-sender" style="text-align:right; color:#ffffff;">태희 (나)</div>
-                        <div class="msg-bubble-right">{chat['text']}</div>
+                        <div style="font-family: 'Galmuri11', monospace; font-size: 0.85rem; color: #ffffff; text-align: right; margin-bottom: 4px; font-weight: 700;">태희 (나)</div>
+                        <div style="font-family: 'Galmuri11', monospace; background-color: #ca8a04; color: #ffffff; padding: 10px 14px; border: 1px solid #fef08a; border-radius: 0px; max-width: 100%; font-size: 0.98rem; line-height: 1.5;">{chat['text']}</div>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+                """
+
+        st.markdown(f"""
+        <div class="messenger-room" style="height:350px;">
+            {kung_html}
+        </div>
+        """, unsafe_allow_html=True)
 
         with st.form(key="kung_form", clear_on_submit=True):
             user_word = st.text_input("단어 입력", placeholder=f"'{st.session_state['kung_current_word'][-1]}'로 시작하는 단어")
