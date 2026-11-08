@@ -142,22 +142,33 @@ st.markdown("""
         box-shadow: 4px 4px 0px #000000 !important;
     }
 
-    /* 메신저 상단 바 및 채팅방 내부 영역 */
+    /* 💡 메신저 및 설명 박스 상단 회색 바 (CHATTING ROOM / EXPLANATION 공용) */
     .messenger-top-bar {
         background: #27272a;
         border: 2px solid #52525b;
         border-bottom: none;
-        padding: 8px 16px;
+        padding: 10px 20px;
         max-width: 850px;
         margin: 0 auto;
     }
     .messenger-top-title {
         font-family: 'Galmuri11', monospace !important;
         color: #facc15;
-        font-size: 1rem;
+        font-size: 1.05rem;
         font-weight: 700;
         text-align: center;
         letter-spacing: 2px;
+    }
+
+    /* 💡 게임 설명 박스 컨테이너 */
+    .explanation-room {
+        background: #18181b;
+        border: 2px solid #52525b;
+        border-top: none;
+        padding: 30px;
+        max-width: 850px;
+        margin: 0 auto 20px auto;
+        box-shadow: 4px 4px 0px #000000;
     }
 
     .messenger-room {
@@ -365,19 +376,24 @@ else:
     # [뉴스 내용 스파이 찾기 게임 모드]
     if st.session_state['active_chat_game'] == "mafia":
         if st.session_state['mafia_phase'] == 'init':
-            st.markdown('<div class="transparent-game-card" style="max-width:700px; margin:0 auto; padding:40px;">', unsafe_allow_html=True)
-            st.markdown("### 뉴스 내용 스파이 찾기")
+            # 💡 [수정] 게임 시작 전 안내문을 회색 상단 바 + 설명 박스 레이아웃으로 감쌈
             st.markdown("""
-            <div style="color: #facc15; font-size: 1.15rem; font-weight: 600; text-align: center; margin-bottom: 20px;">
-                실시간 뉴스 증언 분석 및 가짜 뉴스 판별 추리 모드
+            <div class="messenger-top-bar">
+                <div class="messenger-top-title">EXPLANATION (게임 설명)</div>
             </div>
-            <div style="color: #e4e4e7; text-align: left; line-height: 1.8; margin: 20px 0; font-size: 1.05rem;">
-                1. 버튼을 누르면 실시간 뉴스 사건과 4명의 AI 용의자가 소집된다.<br>
-                2. 용의자들의 증언을 메신저 대화로 확인한다.<br>
-                3. 교묘하게 왜곡된 가짜 뉴스를 퍼트린 스파이를 찾아 지목한다.
+            <div class="explanation-room">
+                <div style="font-size: 1.8rem; font-weight: 900; color: #ffffff; text-align: center; margin-bottom: 10px;">뉴스 내용 스파이 찾기</div>
+                <div style="color: #facc15; font-size: 1.1rem; font-weight: 600; text-align: center; margin-bottom: 25px;">
+                    실시간 뉴스 증언 분석 및 가짜 뉴스 판별 추리 모드
+                </div>
+                <div style="color: #e4e4e7; text-align: left; line-height: 1.8; font-size: 1.05rem; max-width: 650px; margin: 0 auto 30px auto;">
+                    1. 버튼을 누르면 실시간 뉴스 사건과 4명의 AI 용의자가 소집된다.<br>
+                    2. 용의자들의 증언을 메신저 대화로 확인한다.<br>
+                    3. 교묘하게 왜곡된 가짜 뉴스를 퍼트린 스파이를 찾아 지목한다.
+                </div>
             </div>
             """, unsafe_allow_html=True)
-            st.markdown("---")
+            
             if st.button("GAME START", use_container_width=True):
                 if not gemini_key or not client_id:
                     st.error("API Key가 설정되지 않았다!")
@@ -401,7 +417,6 @@ else:
                             st.session_state['messenger_chats'] = chats
                             st.session_state['mafia_phase'] = 'debate'
                             st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
 
         elif st.session_state['mafia_phase'] == 'debate':
             g = st.session_state['mafia_game_data']
@@ -422,7 +437,6 @@ else:
             </div>
             """, unsafe_allow_html=True)
 
-            # 💡 [핵심 수정] HTML 태그 노출 오류 해결을 위해 Streamlit 전용 컨테이너와 안전한 마크다운 방식으로 대화창 구현
             chat_box = st.container(height=280)
             with chat_box:
                 st.markdown('<div style="padding: 5px;">', unsafe_allow_html=True)
