@@ -5,10 +5,10 @@ from google import genai
 from google.genai import types
 
 # ---------------------------------------------------------
-# 1. 페이지 설정 및 다크 블루 아케이드 스타일링
+# 1. 페이지 설정 및 깔끔한 검색엔진 테마 스타일링
 # ---------------------------------------------------------
 st.set_page_config(
-    page_title="FrameLens - AI 뉴스 미디어 스튜디오",
+    page_title="FrameLens - AI 미디어 서치 스튜디오",
     page_icon="🔍",
     layout="wide"
 )
@@ -18,104 +18,105 @@ st.markdown("""
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
     @import url('https://cdn.jsdelivr.net/gh/oungda/galmuri/dist/galmuri.css');
 
-    /* 다크 블루 레트로 스튜디오 배경 */
+    /* 메인 배경 (깔끔한 다크 모드) */
     .stApp {
-        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #09090b 100%);
+        background-color: #0d0e12;
         color: #f3f4f6;
         font-family: 'Galmuri11', monospace !important;
     }
-    
+
     /* 사이드바 스타일링 */
     section[data-testid="stSidebar"] {
-        background-color: #09090b !important;
-        border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+        background-color: #121318 !important;
+        border-right: 1px solid #27272a !important;
     }
     section[data-testid="stSidebar"] span, 
     section[data-testid="stSidebar"] div, 
     section[data-testid="stSidebar"] a {
         font-family: 'Galmuri11', monospace !important;
-        color: #e5e7eb !important;
-        font-size: 1.05rem !important;
-    }
-    [data-testid="stSidebarNav"] a[aria-current="page"] {
-        background: rgba(59, 130, 246, 0.3) !important;
-        color: #ffffff !important;
-        border: 1px solid #3b82f6 !important;
+        color: #e4e4e7 !important;
     }
 
-    /* 상단 레트로 메인 타이틀 */
-    .main-header-title {
+    /* 메인 타이틀 */
+    .main-logo-title {
         font-family: 'Galmuri11', monospace !important;
-        font-size: 3.4rem;
+        font-size: 3.8rem;
         font-weight: 900;
-        color: #60a5fa;
-        text-align: center;
-        margin-top: 15px;
-        margin-bottom: 8px;
-        text-shadow: 0 0 15px rgba(96, 165, 250, 0.8), 0 0 30px rgba(37, 99, 235, 0.6);
-    }
-    .main-header-subtitle {
-        font-family: 'Galmuri11', monospace !important;
-        color: #93c5fd;
-        font-size: 1.15rem;
-        text-align: center;
-        margin-bottom: 35px;
-    }
-
-    /* 이미지 생성 스튜디오 섹션 박스 */
-    .studio-box {
-        background: rgba(15, 23, 42, 0.75);
-        backdrop-filter: blur(12px);
-        border: 2px solid rgba(96, 165, 250, 0.3);
-        border-radius: 12px;
-        padding: 30px;
-        max-width: 900px;
-        margin: 0 auto 35px auto;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    }
-
-    /* 레트로 아케이드 카드 박스 (이동용 카드) */
-    .main-game-card {
-        background: rgba(15, 23, 42, 0.65) !important;
-        border: 2px solid rgba(255, 255, 255, 0.15);
-        border-radius: 12px;
-        padding: 40px 20px;
-        text-align: center;
-        transition: all 0.3s ease;
-    }
-    .main-game-card:hover {
-        border-color: #60a5fa;
-        box-shadow: 0 0 20px rgba(96, 165, 250, 0.5);
-        transform: translateY(-2px);
-    }
-    .card-title-text {
-        font-family: 'Galmuri11', monospace !important;
-        font-size: 2rem;
-        font-weight: 900 !important;
         color: #ffffff;
-        margin: 0;
-        word-break: keep-all;
-        line-height: 1.5;
-        text-shadow: 2px 2px 0px #000000;
+        text-align: center;
+        margin-top: 30px;
+        margin-bottom: 8px;
+        letter-spacing: 2px;
+        text-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
+    }
+    .main-logo-sub {
+        font-family: 'Galmuri11', monospace !important;
+        color: #a1a1aa;
+        font-size: 1.1rem;
+        text-align: center;
+        margin-bottom: 40px;
     }
 
-    /* 레트로 버튼 스타일 */
+    /* 이미지처럼 깔끔한 테두리의 검색 영역 박스 */
+    .search-wrapper {
+        max-width: 800px;
+        margin: 0 auto 30px auto;
+        padding: 10px;
+    }
+
+    /* 검색바 형태의 버튼 및 입력창 디자인 */
+    div[data-testid="stTextInput"] > div > div > input {
+        font-family: 'Galmuri11', monospace !important;
+        background-color: #181920 !important;
+        color: #ffffff !important;
+        border: 2px solid #ffffff !important;
+        border-radius: 0px !important;
+        height: 55px !important;
+        font-size: 1.2rem !important;
+        padding-left: 20px !important;
+    }
+    div[data-testid="stTextInput"] > div > div > input:focus {
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 10px rgba(59, 130, 246, 0.5) !important;
+    }
+
+    /* 레트로 아케이드 버튼 스타일 (검색/옵션 버튼) */
     .stButton > button {
         font-family: 'Galmuri11', monospace !important;
-        background: #2563eb !important;
+        background: #181920 !important;
         color: #ffffff !important;
-        border: 1px solid #93c5fd !important;
-        border-radius: 8px !important;
+        border: 2px solid #ffffff !important;
+        border-radius: 0px !important;
         font-weight: 700 !important;
         font-size: 1.15rem !important;
-        height: 50px !important;
+        height: 55px !important;
         transition: all 0.2s ease !important;
         width: 100% !important;
-        letter-spacing: 1px !important;
     }
     .stButton > button:hover {
-        background: #1d4ed8 !important;
-        box-shadow: 0 0 15px rgba(96, 165, 250, 0.7) !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        border-color: #ffffff !important;
+    }
+
+    /* 바로가기 카드 영역 */
+    .arcade-link-card {
+        background: #14151a;
+        border: 2px solid #27272a;
+        padding: 35px 20px;
+        text-align: center;
+        transition: all 0.2s ease;
+    }
+    .arcade-link-card:hover {
+        border-color: #3b82f6;
+        transform: translateY(-2px);
+    }
+    .card-title {
+        font-family: 'Galmuri11', monospace !important;
+        font-size: 1.8rem;
+        font-weight: 900;
+        color: #ffffff;
+        margin-bottom: 0px;
     }
 
     h1, h2, h3, h4, label, p, span, div {
@@ -166,66 +167,71 @@ def generate_high_quality_image(user_keyword, style_mode="poster"):
         return None
 
 # ---------------------------------------------------------
-# 3. 메인 화면 레이아웃
+# 3. 메인 검색 UI 구성 (이미지 디자인 반영)
 # ---------------------------------------------------------
-st.markdown('<div class="main-header-title">FrameLens Studio</div>', unsafe_allow_html=True)
-st.markdown('<div class="main-header-subtitle">원하는 뉴스 키워드를 검색하고 AI 포스터 & 만화 미디어 콘텐츠를 생성해 보세요!</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-logo-title">FrameLens</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-logo-sub">SEARCH NEWS & CREATE AI MEDIA STUDIO</div>', unsafe_allow_html=True)
 
-# Imagen AI 미디어 스튜디오 박스
-st.markdown('<div class="studio-box">', unsafe_allow_html=True)
-st.markdown("### 🎨 AI 뉴스 미디어 제작 스튜디오")
-st.markdown("뉴스 키워드를 입력하면 Gemini Imagen 3 모델이 고화질 포스터와 만화를 직접 만들어 준다.")
+# 검색창 디자인 레이아웃 (보내준 이미지 형태의 굵은 테두리 검색바)
+search_col1, search_col2, search_col3 = st.columns([5, 1.5, 1.5])
 
-news_keyword = st.text_input("뉴스 검색어 / 키워드 입력", placeholder="예: 인공지능 윤리, 기후위기, 딥페이크, 우주탐사")
+with search_col1:
+    news_keyword = st.text_input(
+        "뉴스 검색어 입력", 
+        placeholder="뉴스 키워드를 입력해라 (예: 인공지능, 기후위기, 딥페이크)",
+        label_visibility="collapsed"
+    )
 
-col_img1, col_img2 = st.columns(2)
-with col_img1:
-    btn_poster = st.button("🖼️ 뉴스 포스터 만들기")
-with col_img2:
-    btn_comic = st.button("🎨 웹툰 만화 만들기")
+with search_col2:
+    btn_poster = st.button("🔍 포스터 생성")
 
+with search_col3:
+    btn_comic = st.button("🔍 만화 생성")
+
+# 이미지 생성 결과 표시 영역
 if btn_poster:
     if not news_keyword.strip():
         st.warning("키워드를 먼저 입력해라!")
     else:
-        with st.spinner("Gemini Imagen 3 모델이 고품질 뉴스 포스터를 그리는 중이다..."):
+        with st.spinner("Gemini Imagen 3 모델이 뉴스 포스터를 생성하는 중이다..."):
             img = generate_high_quality_image(news_keyword.strip(), style_mode="poster")
             if img:
-                st.image(img, caption=f"생성된 AI 뉴스 포스터: '{news_keyword}'", use_container_width=True)
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.image(img, caption=f"AI 뉴스 포스터: '{news_keyword}'", use_container_width=True)
 
 if btn_comic:
     if not news_keyword.strip():
         st.warning("키워드를 먼저 입력해라!")
     else:
-        with st.spinner("Gemini Imagen 3 모델이 웹툰 스타일 만화를 그리는 중이다..."):
+        with st.spinner("Gemini Imagen 3 모델이 웹툰 만화를 생성하는 중이다..."):
             img = generate_high_quality_image(news_keyword.strip(), style_mode="comic")
             if img:
-                st.image(img, caption=f"생성된 AI 뉴스 만화: '{news_keyword}'", use_container_width=True)
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.image(img, caption=f"AI 뉴스 만화: '{news_keyword}'", use_container_width=True)
 
-st.markdown('</div>', unsafe_allow_html=True)
+st.markdown("<br><hr><br>", unsafe_allow_html=True)
 
-st.markdown("---")
+# 하단 게임 아케이드 이동 바로가기 영역
+st.markdown("<h3 style='text-align: center; margin-bottom: 25px;'>🕹️ ARCADE GAME ROOM</h3>", unsafe_allow_html=True)
 
-# 하단 게임 로비 바로가기 카드 (챗/게임 화면인 pages/chat.py로 이동)
-st.markdown("### 🕹️ 아케이드 미디어 게임 센터 바로가기")
-col1, col2 = st.columns(2, gap="large")
+card_col1, card_col2 = st.columns(2, gap="large")
 
-with col1:
+with card_col1:
     st.markdown("""
-    <div class="main-game-card">
-        <div class="card-title-text">뉴스 내용<br>스파이 찾기</div>
+    <div class="arcade-link-card">
+        <div class="card-title">뉴스 내용 스파이 찾기</div>
     </div>
     """, unsafe_allow_html=True)
-    st.markdown('<div style="height: 12px;"></div>', unsafe_allow_html=True)
-    if st.button("게임 화면으로 이동", key="btn_spy"):
+    st.markdown('<div style="height: 10px;"></div>', unsafe_allow_html=True)
+    if st.button("게임 입장 ➔", key="goto_spy"):
         st.switch_page("pages/chat.py")
 
-with col2:
+with card_col2:
     st.markdown("""
-    <div class="main-game-card">
-        <div class="card-title-text">뉴스 키워드<br>쿵쿵따</div>
+    <div class="arcade-link-card">
+        <div class="card-title">뉴스 키워드 쿵쿵따</div>
     </div>
     """, unsafe_allow_html=True)
-    st.markdown('<div style="height: 12px;"></div>', unsafe_allow_html=True)
-    if st.button("게임 화면으로 이동", key="btn_kung"):
+    st.markdown('<div style="height: 10px;"></div>', unsafe_allow_html=True)
+    if st.button("게임 입장 ➔", key="goto_kung"):
         st.switch_page("pages/chat.py")
