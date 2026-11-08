@@ -3,6 +3,7 @@ import urllib.request
 import urllib.parse
 import json
 import random
+from newspaper import Article
 
 # ---------------------------------------------------------
 # 1. 페이지 설정 및 레트로 아케이드 픽셀 폰트 스타일링
@@ -84,7 +85,7 @@ st.markdown("""
         text-shadow: 2px 2px 0px #000000;
     }
 
-    /* 💡 [수정] 뉴스 기사 전문 및 원문 링크 전체 표시 브리핑 박스 */
+    /* 실제 뉴스 기사 전문 표시 박스 */
     .in-app-news-reader {
         background: #18181b;
         border: 3px solid #f59e0b;
@@ -115,11 +116,12 @@ st.markdown("""
         color: #e4e4e7;
         line-height: 1.6;
         background: #09090b;
-        padding: 12px;
+        padding: 14px;
         border-left: 4px solid #f59e0b;
-        max-height: 160px; /* 전문을 충분히 읽을 수 있도록 높이 확대 */
-        overflow-y: auto;  /* 긴 기사의 경우 전체 스크롤해서 확인 가능 */
-        margin-bottom: 10px;
+        max-height: 220px;
+        overflow-y: auto;  
+        margin-bottom: 12px;
+        white-space: pre-wrap;
     }
     .news-link-btn {
         display: inline-block;
@@ -129,7 +131,7 @@ st.markdown("""
         font-weight: 700;
         text-decoration: none;
         border: 1px solid #facc15;
-        padding: 4px 10px;
+        padding: 5px 12px;
         background: #27272a;
     }
     .news-link-btn:hover {
@@ -193,7 +195,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# 2. 세션 상태 초기화
+# 2. 세션 상태 초기화 및 크롤링 함수
 # ---------------------------------------------------------
 if 'total_score' not in st.session_state:
     st.session_state['total_score'] = 0
@@ -217,11 +219,22 @@ client_id = st.secrets.get("NAVER_CLIENT_ID", "").strip()
 client_secret = st.secrets.get("NAVER_CLIENT_SECRET", "").strip()
 gemini_key = st.secrets.get("GEMINI_API_KEY", "").strip()
 
+def fetch_real_article_text(url):
+    try:
+        article = Article(url, language='ko')
+        article.download()
+        article.parse()
+        if article.text and len(article.text.strip()) > 50:
+            return article.text.strip()
+    except Exception:
+        pass
+    return None
+
 def fetch_random_naver_news():
     random_keywords = ["사회", "경제", "기술", "인공지능", "환경", "문화", "과학", "디지털", "스타트업", "글로벌"]
     chosen_query = random.choice(random_keywords)
     encText = urllib.parse.quote(chosen_query)
-    url = f"https://naverapihub.apigw.ntruss.com/search/v1/news?query={encText}&display=20&sort=date"
+    url = f"https://naverapihub.apigw.ntruss.com/search/v1/news?query={encText}&display=30&sort=date"
     
     req = urllib.request.Request(url)
     req.add_header("X-NCP-APIGW-API-KEY-ID", client_id)
@@ -232,33 +245,39 @@ def fetch_random_naver_news():
             if response.getcode() == 200:
                 data = json.loads(response.read().decode('utf-8'))
                 items = data.get('items', [])
-                if items:
-                    return random.choice(items)
+                random.shuffle(items)
+                for item in items:
+                    link = item.get('originallink', item.get('link', ''))
+                    if link:
+                        full_text = fetch_real_article_text(link)
+                        if full_text:
+                            item['full_article'] = full_text
+                            return item
         return None
     except Exception:
         return None
 
-def generate_mafia_game(title, desc, api_key):
+def generate_mafia_game(title, full_text, api_key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={api_key}"
     prompt = f"""
-    뉴스 내용 스파이 찾기 게임 진행자 역할을 수행한다. 다음 뉴스 기사를 바탕으로 게임을 구성한다.
+    뉴스 내용 스파이 찾기 게임 진행자 역할을 수행한다. 다음 실제 뉴스 기사 전문을 바탕으로 게임을 구성한다.
     - 뉴스 제목: {title}
-    - 뉴스 내용: {desc}
+    - 뉴스 전문: {full_text}
 
     4명의 AI 용의자 플레이어(김시민, 박기자, 최학자, 이스파이)가 존재한다.
-    이 중 한 명은 스파이이며, 뉴스 내용을 거짓으로 주장하거나 왜곡된 발언을 한다.
+    이 중 한 명은 스파이이며, 위 뉴스 전문의 내용을 왜곡하거나 거짓 발언을 한다.
 
     반드시 아래 JSON 형식으로만 답변한다:
     {{
       "players": [
-        {{"name": "김시민", "role": "시민", "statement": "진짜 기사 관련 1번 증언"}},
-        {{"name": "박기자", "role": "시민", "statement": "진짜 기사 관련 2번 증언"}},
-        {{"name": "최학자", "role": "시민", "statement": "진짜 기사 관련 3번 증언"}},
+        {{"name": "김시민", "role": "시민", "statement": "진짜 기사 본문에 기반한 1번 증언"}},
+        {{"name": "박기자", "role": "시민", "statement": "진짜 기사 본문에 기반한 2번 증언"}},
+        {{"name": "최학자", "role": "시민", "statement": "진짜 기사 본문에 기반한 3번 증언"}},
         {{"name": "이스파이", "role": "스파이", "statement": "교묘하게 왜곡된 가짜 뉴스 증언"}}
       ],
       "spy_index": 3,
       "defense": "스파이가 최후의 변론으로 하는 변명",
-      "fact_check": "진짜 뉴스 팩트체크 해설"
+      "fact_check": "진짜 뉴스 본문에 따른 팩트체크 해설"
     }}
     """
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
@@ -281,8 +300,8 @@ def generate_mafia_game(title, desc, api_key):
     return {
         "players": [
             {"name": "김시민", "role": "시민", "statement": f"이번 기사는 {title[:15]} 관련 사건이 확실하다."},
-            {"name": "박기자", "role": "시민", "statement": f"보도된 바에 따르면 {desc[:25]} 내용이다."},
-            {"name": "최학자", "role": "시민", "statement": "전문가 분석 결과도 기사 본문과 동일하다."},
+            {"name": "박기자", "role": "시민", "statement": "본문에 따르면 해당 사안은 철저한 분석이 필요하다."},
+            {"name": "최학자", "role": "시민", "statement": "전문가들도 기사 내용과 동일한 입장을 밝혔다."},
             {"name": "이스파이", "role": "스파이", "statement": "사실 이번 기사는 전부 거짓이며 외계인이 개입했다!"}
         ],
         "spy_index": 3,
@@ -390,7 +409,7 @@ else:
                     실시간 뉴스 증언 분석 및 가짜 뉴스 판별 추리 모드
                 </div>
                 <div style="color: #e4e4e7; text-align: left; line-height: 1.8; font-size: 1.05rem; max-width: 650px; margin: 0 auto 30px auto;">
-                    1. 버튼을 누르면 실시간 뉴스 사건과 4명의 AI 용의자가 소집된다.<br>
+                    1. 버튼을 누르면 실제 네이버 뉴스 전문과 4명의 AI 용의자가 소집된다.<br>
                     2. 용의자들의 증언을 메신저 대화로 확인한다.<br>
                     3. 교묘하게 왜곡된 가짜 뉴스를 퍼트린 스파이를 찾아 지목한다.
                 </div>
@@ -401,16 +420,16 @@ else:
                 if not gemini_key or not client_id:
                     st.error("API Key가 설정되지 않았다!")
                 else:
-                    with st.spinner("용의자 소집 중..."):
+                    with st.spinner("실시간 뉴스 원문 크롤링 및 용의자 소집 중... (약 3~5초 소요)"):
                         random_item = fetch_random_naver_news()
                         if random_item:
                             t = random_item.get('title', '').replace("<b>", "").replace("</b>", "").replace("&quot;", '"').replace("&amp;", "&")
-                            d = random_item.get('description', '').replace("<b>", "").replace("</b>", "").replace("&quot;", '"').replace("&amp;", "&")
+                            full_text = random_item.get('full_article', '')
                             l = random_item.get('originallink', random_item.get('link', '#'))
                             
-                            g_data = generate_mafia_game(t, d, gemini_key)
+                            g_data = generate_mafia_game(t, full_text, gemini_key)
                             g_data['title'] = t
-                            g_data['desc'] = d
+                            g_data['full_article'] = full_text
                             g_data['link'] = l
                             st.session_state['mafia_game_data'] = g_data
                             
@@ -424,13 +443,14 @@ else:
         elif st.session_state['mafia_phase'] == 'debate':
             g = st.session_state['mafia_game_data']
             news_link = g.get('link', '#')
+            full_article_text = g.get('full_article', '기사 전문을 불러오지 못했습니다.')
             
-            # 💡 [핵심 수정] 뉴스 기사 전문 스크롤 제공 및 원문 링크 버튼 추가
+            # 💡 [핵심] 실제 기사 크롤링 전문과 원문 링크 출력
             st.markdown(f"""
             <div class="in-app-news-reader">
-                <div class="news-reader-header">> BRIEFING: 실시간 출제 뉴스 전문</div>
+                <div class="news-reader-header">> BRIEFING: 실제 출제 뉴스 전문 (크롤링 완료)</div>
                 <div class="news-reader-title">{g['title']}</div>
-                <div class="news-reader-body">{g['desc']}</div>
+                <div class="news-reader-body">{full_article_text}</div>
                 <div style="text-align: right;">
                     <a href="{news_link}" target="_blank" class="news-link-btn">🔗 네이버 원문 기사 전체 읽기 ➔</a>
                 </div>
@@ -535,7 +555,7 @@ else:
             st.markdown('<div style="padding: 5px;">', unsafe_allow_html=True)
             for chat in st.session_state['kung_history']:
                 text = chat.get('text', '')
-                if chat.get('role') == 'ai':
+                if chat.get('role'] == 'ai':
                     st.markdown(f"""
                     <div style="display: flex; justify-content: flex-start; margin-bottom: 12px;">
                         <div>
@@ -548,7 +568,7 @@ else:
                     st.markdown(f"""
                     <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
                         <div>
-                            <div style="font-family: 'Galmuri11', monospace; font-size: 0.82rem; color: #ffffff; text-align: right; margin-bottom: 3px; font-weight: 700;">태희 (나)</div>
+                            <div style="font-family: 'Galmuri11', monospace; font-size: 0.82rem; color: #ffffff; text-align: right; margin-bottom: 3px; font-weight: 700;">태히 (나)</div>
                             <div style="font-family: 'Galmuri11', monospace; background-color: #ca8a04; color: #ffffff; padding: 8px 12px; border: 1px solid #fef08a; font-size: 0.95rem; line-height: 1.4;">{text}</div>
                         </div>
                     </div>
