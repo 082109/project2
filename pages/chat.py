@@ -89,34 +89,36 @@ st.markdown("""
         background: #18181b;
         border: 3px solid #f59e0b;
         border-radius: 0px;
-        padding: 24px;
+        padding: 18px 20px;
         max-width: 850px;
-        margin: 0 auto 20px auto;
+        margin: 0 auto 15px auto;
         box-shadow: 4px 4px 0px #000000;
     }
     .news-reader-header {
         font-family: 'Galmuri11', monospace !important;
         color: #f59e0b;
-        font-size: 1rem;
+        font-size: 0.95rem;
         font-weight: 700;
-        margin-bottom: 8px;
+        margin-bottom: 6px;
     }
     .news-reader-title {
         font-family: 'Galmuri11', monospace !important;
-        font-size: 1.3rem;
+        font-size: 1.2rem;
         font-weight: 700;
         color: #ffffff;
-        margin-bottom: 12px;
+        margin-bottom: 8px;
         line-height: 1.4;
     }
     .news-reader-body {
         font-family: 'Galmuri11', monospace !important;
-        font-size: 1.05rem;
+        font-size: 0.98rem;
         color: #e4e4e7;
-        line-height: 1.6;
+        line-height: 1.5;
         background: #09090b;
-        padding: 15px;
+        padding: 12px;
         border-left: 4px solid #f59e0b;
+        max-height: 100px;
+        overflow-y: auto;
     }
 
     /* 레트로 아케이드 버튼 스타일 */
@@ -140,63 +142,67 @@ st.markdown("""
         box-shadow: 4px 4px 0px #000000 !important;
     }
 
-    /* 메신저 영역 */
+    /* 메신저 영역 (CHATTING ROOM) */
     .messenger-top-bar {
         background: #27272a;
         border: 2px solid #52525b;
         border-bottom: none;
-        padding: 12px 20px;
+        padding: 10px 20px;
         max-width: 850px;
         margin: 0 auto;
     }
     .messenger-top-title {
         font-family: 'Galmuri11', monospace !important;
         color: #facc15;
-        font-size: 1.1rem;
+        font-size: 1.05rem;
         font-weight: 700;
         text-align: center;
         letter-spacing: 2px;
     }
 
+    /* 💡 용의자 대화가 표시되는 CHATTING ROOM 레이아웃 박스 */
     .messenger-room {
         background: #18181b;
         border: 2px solid #52525b;
         border-top: none;
-        padding: 25px;
+        padding: 20px;
         max-width: 850px;
-        margin: 0 auto 20px auto;
-        height: 380px;
+        margin: 0 auto 15px auto;
+        height: 320px;
         overflow-y: auto;
     }
 
-    .msg-row-left { display: flex; justify-content: flex-start; margin-bottom: 16px; }
-    .msg-row-right { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+    .msg-row-left { display: flex; justify-content: flex-start; margin-bottom: 12px; }
+    .msg-row-right { display: flex; justify-content: flex-end; margin-bottom: 12px; }
     
     .msg-bubble-left {
         font-family: 'Galmuri11', monospace !important;
         background-color: #27272a;
         color: #f4f4f5;
-        padding: 10px 16px;
+        padding: 8px 14px;
         border: 1px solid #52525b;
         border-radius: 0px;
-        max-width: 75%;
-        font-size: 1.05rem;
+        max-width: 80%;
+        font-size: 0.98rem;
+        line-height: 1.5;
     }
     .msg-bubble-right {
         font-family: 'Galmuri11', monospace !important;
         background-color: #ca8a04;
         color: #ffffff;
-        padding: 10px 16px;
+        padding: 8px 14px;
         border: 1px solid #fef08a;
         border-radius: 0px;
-        max-width: 75%;
-        font-size: 1.05rem;
+        max-width: 80%;
+        font-size: 0.98rem;
+        line-height: 1.5;
     }
     .msg-sender { 
         font-family: 'Galmuri11', monospace !important;
         font-size: 0.85rem; 
-        color: #a1a1aa; 
-        margin-bottom: 4px; 
+        color: #facc15; 
+        margin-bottom: 3px; 
+        font-weight: 700;
     }
 
     h1, h2, h3, h4, label, p, span, div {
@@ -258,7 +264,7 @@ def generate_mafia_game(title, desc, api_key):
     - 뉴스 제목: {title}
     - 뉴스 요약: {desc}
 
-    4명의 AI 플레이어(1: 김시민, 2: 박기자, 3: 최학자, 4: 이스파이)가 존재한다.
+    4명의 AI 용의자 플레이어(김시민, 박기자, 최학자, 이스파이)가 존재한다.
     이 중 한 명은 스파이이며, 뉴스 내용을 거짓으로 주장하거나 왜곡된 발언을 한다.
 
     반드시 아래 JSON 형식으로만 답변한다:
@@ -423,9 +429,10 @@ else:
                             g_data['link'] = l
                             st.session_state['mafia_game_data'] = g_data
                             
+                            # 💡 용의자 4명의 증언 대화를 CHATTING ROOM 레이아웃으로 직행하도록 초기화
                             chats = []
-                            for p in g_data['players']:
-                                chats.append({"sender": p['name'], "text": p['statement']})
+                            for idx, p in enumerate(g_data['players']):
+                                chats.append({"sender": f"{idx+1}번 용의자 [{p['name']}]", "text": p['statement']})
                             st.session_state['messenger_chats'] = chats
                             st.session_state['mafia_phase'] = 'debate'
                             st.rerun()
@@ -434,6 +441,7 @@ else:
         elif st.session_state['mafia_phase'] == 'debate':
             g = st.session_state['mafia_game_data']
             
+            # 상단 뉴스 브리핑 박스
             st.markdown(f"""
             <div class="in-app-news-reader">
                 <div class="news-reader-header">> BRIEFING: 실시간 출제 뉴스</div>
@@ -442,19 +450,21 @@ else:
             </div>
             """, unsafe_allow_html=True)
 
+            # CHATTING ROOM 상단바
             st.markdown("""
             <div class="messenger-top-bar">
-                <div class="messenger-top-title">CHATTING ROOM</div>
+                <div class="messenger-top-title">CHATTING ROOM (용의자 증언 대화창)</div>
             </div>
             """, unsafe_allow_html=True)
 
+            # 💡 CHATTING ROOM 레이아웃 박스 내에 용의자 4명 증언 & 사용자 메시지 출력
             st.markdown('<div class="messenger-room">', unsafe_allow_html=True)
             for chat in st.session_state['messenger_chats']:
                 if chat['sender'] == "태희 (나)":
                     st.markdown(f"""
                     <div class="msg-row-right">
                         <div>
-                            <div class="msg-sender" style="text-align:right;">{chat['sender']}</div>
+                            <div class="msg-sender" style="text-align:right; color:#ffffff;">{chat['sender']}</div>
                             <div class="msg-bubble-right">{chat['text']}</div>
                         </div>
                     </div>
@@ -471,7 +481,7 @@ else:
             st.markdown('</div>', unsafe_allow_html=True)
 
             with st.form(key="msg_form", clear_on_submit=True):
-                user_msg = st.text_input("메시지 입력", placeholder="예: 3번 진술이 이상하다.")
+                user_msg = st.text_input("메시지 입력", placeholder="예: 3번 진술이 이상하다. 거짓말 같다.")
                 msg_submit = st.form_submit_button("전송", use_container_width=True)
 
             if msg_submit and user_msg.strip():
@@ -480,7 +490,7 @@ else:
 
             st.markdown("---")
             st.markdown("### 스파이 지목 투표")
-            player_names = [f"{idx+1}번: {p['name']}" for idx, p in enumerate(g['players'])]
+            player_names = [f"{idx+1}번 용의자: {p['name']}" for idx, p in enumerate(g['players'])]
             selected_player = st.selectbox("처형할 용의자 선택", options=player_names)
             
             if st.button("투표 확정", use_container_width=True):
@@ -530,13 +540,13 @@ else:
         </div>
         """, unsafe_allow_html=True)
 
-        st.markdown('<div class="messenger-room" style="height:400px;">', unsafe_allow_html=True)
+        st.markdown('<div class="messenger-room" style="height:350px;">', unsafe_allow_html=True)
         for chat in st.session_state['kung_history']:
             if chat['role'] == 'ai':
                 st.markdown(f"""
                 <div class="msg-row-left">
                     <div>
-                        <div class="msg-sender">AI SHOW HOST</div>
+                        <div class="msg-sender" style="color:#facc15;">AI SHOW HOST</div>
                         <div class="msg-bubble-left">{chat['text']}</div>
                     </div>
                 </div>
@@ -545,7 +555,7 @@ else:
                 st.markdown(f"""
                 <div class="msg-row-right">
                     <div>
-                        <div class="msg-sender" style="text-align:right;">태희 (나)</div>
+                        <div class="msg-sender" style="text-align:right; color:#ffffff;">태희 (나)</div>
                         <div class="msg-bubble-right">{chat['text']}</div>
                     </div>
                 </div>
