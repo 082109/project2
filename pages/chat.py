@@ -84,7 +84,7 @@ st.markdown("""
         text-shadow: 2px 2px 0px #000000;
     }
 
-    /* 💡 시인성을 높인 실제 뉴스 브리핑 박스 및 원문 링크 버튼 스타일 */
+    /* 💡 [수정] 뉴스 요약 본문이 잘리지 않고 전체 다 보이도록 높이 제한 해제 */
     .in-app-news-reader {
         background: #18181b;
         border: 3px solid #f59e0b;
@@ -118,6 +118,8 @@ st.markdown("""
         padding: 14px;
         border-left: 4px solid #f59e0b;
         margin-bottom: 14px;
+        height: auto !important; /* 높이 제한 해제 */
+        max-height: none !important; /* 최대 높이 제한 해제 */
     }
     .news-link-btn {
         display: block;
@@ -428,7 +430,7 @@ else:
             news_link = g.get('link', '#')
             news_desc = g.get('desc', '')
             
-            # 💡 실제 뉴스 브리핑과 눈에 띄는 원문 바로가기 버튼 제공
+            # 💡 높이 제한이 풀린 뉴스 브리핑 박스
             st.markdown(f"""
             <div class="in-app-news-reader">
                 <div class="news-reader-header">> BRIEFING: 실시간 네이버 뉴스 출제 요약</div>
@@ -538,7 +540,7 @@ else:
             st.markdown('<div style="padding: 5px;">', unsafe_allow_html=True)
             for chat in st.session_state['kung_history']:
                 text = chat.get('text', '')
-                if chat.get('role') == 'ai':
+                if chat.get('role'] == 'ai':
                     st.markdown(f"""
                     <div style="display: flex; justify-content: flex-start; margin-bottom: 12px;">
                         <div>
