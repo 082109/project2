@@ -73,7 +73,7 @@ st.markdown("""
         font-weight: 400;
     }
 
-    /* 💡 첨부했던 이미지 형태의 깔끔하고 각진 블랙 검색 바 컨테이너 */
+    /* 깔끔하고 각진 블랙 검색 바 컨테이너 */
     .search-pill-container {
         background: #181920;
         border: 2px solid #ffffff;
