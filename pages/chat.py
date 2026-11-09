@@ -296,22 +296,54 @@ def generate_mafia_game(title, desc, api_key):
         "fact_check": "4번 증언은 완전히 왜곡된 가짜 뉴스다."
     }
 
-def get_kung_reply(user_word, last_word, api_key):
+def init_kung_game(news_title, news_desc, api_key):
+    """실시간 뉴스 기사 내용 기반으로 첫 제시어를 추출하고 검증 기준을 세우는 함수"""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={api_key}"
+    prompt = f"""
+    뉴스 키워드 쿵쿵따 게임의 첫 번째 제시어를 선정한다.
+    제공된 뉴스 기사 제목과 내용을 분석하여, 기사에 등장하거나 기사와 직접 연관된 **핵심 명사 단어 1개**를 첫 제시어(first_word)로 골라라. (예: 인공지능, 환경, 디지털 등)
+    
+    - 뉴스 제목: {news_title}
+    - 뉴스 내용: {news_desc}
+
+    반드시 아래 JSON 형식으로만 답변한다:
+    {{
+      "first_word": "선정된핵심단어"
+    }}
+    """
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    data = json.dumps(payload).encode('utf-8')
+    req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+    try:
+        with urllib.request.urlopen(req) as response:
+            if response.getcode() == 200:
+                res_json = json.loads(response.read().decode('utf-8'))
+                raw_text = res_json['candidates'][0]['content']['parts'][0]['text']
+                clean_json = raw_text[raw_text.find("{"):raw_text.rfind("}")+1]
+                return json.loads(clean_json).get("first_word", "인공지능")
+    except Exception:
+        pass
+    return "인공지능"
+
+def get_kung_reply(user_word, last_word, news_title, news_desc, api_key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={api_key}"
     prompt = f"""
     뉴스 키워드 쿵쿵따 게임 AI 파트너 역할을 수행한다.
-    마지막 단어: '{last_word}'
-    사용자가 제시한 단어: '{user_word}'
+    - 배경 뉴스 제목: {news_title}
+    - 배경 뉴스 내용: {news_desc}
+    - 이전 단어 마지막 글자: '{last_word[-1]}'
+    - 사용자가 입력한 단어: '{user_word}'
     
     규칙:
-    1. 사용자가 마지막 단어의 끝글자로 시작하는 올바른 단어를 말했다면 칭찬하고, 그 단어의 끝글자로 시작하는 새로운 뉴스/시사 관련 단어를 이어준다.
-    2. 글자가 틀렸거나 시사/단어 규칙에 맞지 않으면 지적하고 다시 기회를 준다.
+    1. 사용자가 이전 단어의 마지막 글자로 정확히 시작하는 단어를 입력했는지 확인한다.
+    2. 사용자가 입력한 단어가 **위 배경 뉴스 기사의 내용/맥락과 관련이 있거나 시사상식에 부합하는 단어**인지 검증한다. 만약 뉴스 기사에 전혀 등장하지 않거나 관련 없는 엉뚱한 단어(예: 바나나, 강아지 등)를 입력했다면 status를 "fail"로 처리하고, "기사 내용과 무관한 단어다! 게임 패배!"라는 메시지를 출력하게 해라.
+    3. 올바르게 입력했다면 status를 "success"로 하고, 사용자가 입력한 단어의 마지막 글자로 시작하는 새로운 뉴스/시사 관련 단어를 다음 제시어(next_word)로 이어준다.
     
-    반드시 JSON 형식으로만 답변한다:
+    반드시 아래 JSON 형식으로만 답변한다:
     {{
       "status": "success" 또는 "fail",
-      "reply_text": "AI의 대화 및 반응 메시지 (~다 체 사용)",
-      "next_word": "성공 시 AI가 이어갈 새로운 단어"
+      "reply_text": "AI의 반응 및 판정 메시지 (~다 체 사용)",
+      "next_word": "성공 시 AI가 이어갈 새로운 단어 (실패 시 빈 문자열)"
     }}
     """
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
@@ -328,8 +360,8 @@ def get_kung_reply(user_word, last_word, api_key):
         pass
     return {
         "status": "success",
-        "reply_text": f"좋다! '{user_word}'에 이어 **'기후변화'**로 진행한다.",
-        "next_word": "기후변화"
+        "reply_text": f"좋다! '{user_word}'에 이어 기사 속 키워드인 **'디지털'**로 이어간다.",
+        "next_word": "디지털"
     }
 
 # ---------------------------------------------------------
@@ -366,25 +398,31 @@ if st.session_state['active_chat_game'] is None:
         st.markdown('<div style="height: 14px;"></div>', unsafe_allow_html=True)
         if st.button("GAME START", key="lobby_kung_btn", use_container_width=True):
             st.session_state['active_chat_game'] = "kungkungta"
-            chosen_word = random.choice(["인공지능", "경제성장", "기후변화", "우주탐사", "디지털혁신", "글로벌무역"])
-            st.session_state['kung_current_word'] = chosen_word
-            st.session_state['kung_history'] = [
-                {"role": "ai", "text": f"뉴스 키워드 쿵쿵따에 입장했다. 첫 제시어는 **'{chosen_word}'**이다. 이어서 입력해라."}
-            ]
-            # 쿵쿵따 게임 시작 시 연동될 실시간 뉴스 기사 가져오기
-            random_news = fetch_random_naver_news()
-            if random_news:
+            
+            # 쿵쿵따 시작 시 실시간 뉴스를 먼저 뽑고 그 기사에서 첫 제시어를 추출!
+            with st.spinner("실시간 시사 뉴스 연동 및 키워드 추출 중..."):
+                random_news = fetch_random_naver_news()
+                if random_news:
+                    ntitle = random_news.get('title', '').replace("<b>", "").replace("</b>", "").replace("&quot;", '"').replace("&amp;", "&")
+                    ndesc = random_news.get('description', '').replace("<b>", "").replace("</b>", "").replace("&quot;", '"').replace("&amp;", "&")
+                    nlink = random_news.get('originallink', random_news.get('link', '#'))
+                else:
+                    ntitle = "디지털 시대의 미디어 리터러시와 정보 판별 역량"
+                    ndesc = "최근 다양한 채널을 통해 쏟아지는 정보 속에서 올바른 사실을 판별하고 비판적으로 수용하는 교육의 중요성이 강조되고 있다."
+                    nlink = "#"
+                
                 st.session_state['kung_news_data'] = {
-                    "title": random_news.get('title', '').replace("<b>", "").replace("</b>", "").replace("&quot;", '"').replace("&amp;", "&"),
-                    "description": random_news.get('description', '').replace("<b>", "").replace("</b>", "").replace("&quot;", '"').replace("&amp;", "&"),
-                    "link": random_news.get('originallink', random_news.get('link', '#'))
+                    "title": ntitle,
+                    "description": ndesc,
+                    "link": nlink
                 }
-            else:
-                st.session_state['kung_news_data'] = {
-                    "title": "디지털 시대의 미디어 리터러시와 정보 판별 역량",
-                    "description": "최근 다양한 채널을 통해 쏟아지는 정보 속에서 올바른 사실을 판별하고 비판적으로 수용하는 교육의 중요성이 강조되고 있다.",
-                    "link": "#"
-                }
+                
+                # 기사 내용 기반 첫 제시어 추출
+                first_keyword = init_kung_game(ntitle, ndesc, gemini_key)
+                st.session_state['kung_current_word'] = first_keyword
+                st.session_state['kung_history'] = [
+                    {"role": "ai", "text": f"뉴스 키워드 쿵쿵따에 입장했다. 배경 뉴스 기사를 분석했다. 첫 제시어는 위 기사 속 핵심 단어인 **'{first_keyword}'**이다. 이어서 입력해라!"}
+                ]
             st.rerun()
 
 else:
@@ -445,7 +483,6 @@ else:
             news_link = g.get('link', '#')
             news_body = g.get('news_body', '')
             
-            # 실제 뉴스 기반 풍성한 본문과 원문 링크 출력
             st.markdown(f"""
             <div class="in-app-news-reader">
                 <div class="news-reader-header">> BRIEFING: 실시간 출제 뉴스 브리핑</div>
@@ -457,7 +494,6 @@ else:
             </div>
             """, unsafe_allow_html=True)
 
-            # CHATTING ROOM 상단 바
             st.markdown("""
             <div class="messenger-top-bar">
                 <div class="messenger-top-title">CHATTING ROOM (용의자 증언 대화창)</div>
@@ -539,11 +575,10 @@ else:
         st.markdown(f"### 뉴스 키워드 쿵쿵따 (현재 제시어: **{st.session_state['kung_current_word']}** / 끝 글자: **'{st.session_state['kung_current_word'][-1]}'**)")
         st.markdown("""
         <div style="color: #facc15; font-size: 1.1rem; font-weight: 500; margin-bottom: 15px;">
-            AI 파트너와 진행하는 실시간 시사 끝말잇기 대결
+            위 배경 뉴스 기사의 내용 및 키워드와 연계하여 끝말잇기를 진행하세요! (뉴스 무관 단어 입력 시 패배)
         </div>
         """, unsafe_allow_html=True)
         
-        # 쿵쿵따 게임 화면 상단에 연동된 실시간 뉴스 기사 브리핑 박스 출력
         if st.session_state.get('kung_news_data'):
             k_news = st.session_state['kung_news_data']
             st.markdown(f"""
@@ -591,7 +626,7 @@ else:
             st.markdown('</div>', unsafe_allow_html=True)
 
         with st.form(key="kung_form", clear_on_submit=True):
-            user_word = st.text_input("단어 입력", placeholder=f"'{st.session_state['kung_current_word'][-1]}'로 시작하는 단어")
+            user_word = st.text_input("단어 입력", placeholder=f"'{st.session_state['kung_current_word'][-1]}'로 시작하고 뉴스 기사와 연관된 단어")
             kung_submit = st.form_submit_button("단어 전송", use_container_width=True)
 
         if kung_submit:
@@ -601,7 +636,8 @@ else:
                 st.error("API Key가 설정되지 않았다!")
             else:
                 last_w = st.session_state['kung_current_word']
-                res = get_kung_reply(user_word.strip(), last_w, gemini_key)
+                k_news = st.session_state['kung_news_data']
+                res = get_kung_reply(user_word.strip(), last_w, k_news['title'], k_news['description'], gemini_key)
                 
                 st.session_state['kung_history'].append({"role": "user", "text": user_word.strip()})
                 st.session_state['kung_history'].append({"role": "ai", "text": res.get('reply_text', '')})
@@ -609,4 +645,7 @@ else:
                 if res.get('status') == 'success':
                     st.session_state['total_score'] += 10
                     st.session_state['kung_current_word'] = res.get('next_word', last_w)
+                else:
+                    # 실패 시 점수 차감 또는 게임 오버 처리 가능
+                    pass
                 st.rerun()
