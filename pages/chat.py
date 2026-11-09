@@ -15,7 +15,7 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    @import url('https://cdn.jsdelivr.net/gh/oungda/galmuri/dist/galmuri.css');
+    @import url('[https://cdn.jsdelivr.net/gh/oungda/galmuri/dist/galmuri.css](https://cdn.jsdelivr.net/gh/oungda/galmuri/dist/galmuri.css)');
 
     .stApp {
         background: #09090b;
@@ -213,6 +213,8 @@ if 'kung_history' not in st.session_state:
     st.session_state['kung_history'] = []
 if 'kung_current_word' not in st.session_state:
     st.session_state['kung_current_word'] = None
+if 'kung_news_data' not in st.session_state:
+    st.session_state['kung_news_data'] = None
 
 client_id = st.secrets.get("NAVER_CLIENT_ID", "").strip()
 client_secret = st.secrets.get("NAVER_CLIENT_SECRET", "").strip()
@@ -222,7 +224,7 @@ def fetch_random_naver_news():
     random_keywords = ["사회", "경제", "기술", "인공지능", "환경", "문화", "과학", "디지털", "스타트업", "글로벌"]
     chosen_query = random.choice(random_keywords)
     encText = urllib.parse.quote(chosen_query)
-    url = f"https://naverapihub.apigw.ntruss.com/search/v1/news?query={encText}&display=20&sort=date"
+    url = f"[https://naverapihub.apigw.ntruss.com/search/v1/news?query=](https://naverapihub.apigw.ntruss.com/search/v1/news?query=){encText}&display=20&sort=date"
     
     req = urllib.request.Request(url)
     req.add_header("X-NCP-APIGW-API-KEY-ID", client_id)
@@ -240,7 +242,7 @@ def fetch_random_naver_news():
         return None
 
 def generate_mafia_game(title, desc, api_key):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={api_key}"
+    url = f"[https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=){api_key}"
     prompt = f"""
     뉴스 내용 스파이 찾기 게임 진행자 역할을 수행한다. 다음 실제 뉴스 기사 요약 정보를 바탕으로 게임을 풍성하게 구성한다.
     - 뉴스 제목: {title}
@@ -295,7 +297,7 @@ def generate_mafia_game(title, desc, api_key):
     }
 
 def get_kung_reply(user_word, last_word, api_key):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={api_key}"
+    url = f"[https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=){api_key}"
     prompt = f"""
     뉴스 키워드 쿵쿵따 게임 AI 파트너 역할을 수행한다.
     마지막 단어: '{last_word}'
@@ -369,6 +371,20 @@ if st.session_state['active_chat_game'] is None:
             st.session_state['kung_history'] = [
                 {"role": "ai", "text": f"뉴스 키워드 쿵쿵따에 입장했다. 첫 제시어는 **'{chosen_word}'**이다. 이어서 입력해라."}
             ]
+            # 쿵쿵따 게임 시작 시 연동될 실시간 뉴스 기사 가져오기
+            random_news = fetch_random_naver_news()
+            if random_news:
+                st.session_state['kung_news_data'] = {
+                    "title": random_news.get('title', '').replace("<b>", "").replace("</b>", "").replace("&quot;", '"').replace("&amp;", "&"),
+                    "description": random_news.get('description', '').replace("<b>", "").replace("</b>", "").replace("&quot;", '"').replace("&amp;", "&"),
+                    "link": random_news.get('originallink', random_news.get('link', '#'))
+                }
+            else:
+                st.session_state['kung_news_data'] = {
+                    "title": "디지털 시대의 미디어 리터러시와 정보 판별 역량",
+                    "description": "최근 다양한 채널을 통해 쏟아지는 정보 속에서 올바른 사실을 판별하고 비판적으로 수용하는 교육의 중요성이 강조되고 있다.",
+                    "link": "#"
+                }
             st.rerun()
 
 else:
@@ -429,7 +445,7 @@ else:
             news_link = g.get('link', '#')
             news_body = g.get('news_body', '')
             
-            # 💡 실제 뉴스 기반 풍성한 본문과 원문 링크 출력
+            # 실제 뉴스 기반 풍성한 본문과 원문 링크 출력
             st.markdown(f"""
             <div class="in-app-news-reader">
                 <div class="news-reader-header">> BRIEFING: 실시간 출제 뉴스 브리핑</div>
@@ -526,6 +542,21 @@ else:
             AI 파트너와 진행하는 실시간 시사 끝말잇기 대결
         </div>
         """, unsafe_allow_html=True)
+        
+        # 쿵쿵따 게임 화면 상단에 연동된 실시간 뉴스 기사 브리핑 박스 출력
+        if st.session_state.get('kung_news_data'):
+            k_news = st.session_state['kung_news_data']
+            st.markdown(f"""
+            <div class="in-app-news-reader">
+                <div class="news-reader-header">> CURRENT ISSUE: 쿵쿵따 배경 시사 뉴스</div>
+                <div class="news-reader-title">{k_news['title']}</div>
+                <div class="news-reader-body">{k_news['description']}</div>
+                <div style="text-align: right;">
+                    <a href="{k_news['link']}" target="_blank" class="news-link-btn">🔗 네이버 원문 기사 전체 읽기 ➔</a>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
         st.markdown("---")
 
         st.markdown("""
@@ -539,7 +570,7 @@ else:
             st.markdown('<div style="padding: 5px;">', unsafe_allow_html=True)
             for chat in st.session_state['kung_history']:
                 text = chat.get('text', '')
-                if chat.get('role') == 'ai':
+                if chat.get('role'] == 'ai':
                     st.markdown(f"""
                     <div style="display: flex; justify-content: flex-start; margin-bottom: 12px;">
                         <div>
@@ -575,7 +606,7 @@ else:
                 st.session_state['kung_history'].append({"role": "user", "text": user_word.strip()})
                 st.session_state['kung_history'].append({"role": "ai", "text": res.get('reply_text', '')})
                 
-                if res.get('status') == 'success':
+                if res.get('status'] == 'success':
                     st.session_state['total_score'] += 10
                     st.session_state['kung_current_word'] = res.get('next_word', last_w)
                 st.rerun()
