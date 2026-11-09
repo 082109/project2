@@ -15,7 +15,7 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    @import url('[https://cdn.jsdelivr.net/gh/oungda/galmuri/dist/galmuri.css](https://cdn.jsdelivr.net/gh/oungda/galmuri/dist/galmuri.css)');
+    @import url('https://cdn.jsdelivr.net/gh/oungda/galmuri/dist/galmuri.css');
 
     .stApp {
         background: #09090b;
@@ -224,7 +224,7 @@ def fetch_random_naver_news():
     random_keywords = ["사회", "경제", "기술", "인공지능", "환경", "문화", "과학", "디지털", "스타트업", "글로벌"]
     chosen_query = random.choice(random_keywords)
     encText = urllib.parse.quote(chosen_query)
-    url = f"[https://naverapihub.apigw.ntruss.com/search/v1/news?query=](https://naverapihub.apigw.ntruss.com/search/v1/news?query=){encText}&display=20&sort=date"
+    url = f"https://naverapihub.apigw.ntruss.com/search/v1/news?query={encText}&display=20&sort=date"
     
     req = urllib.request.Request(url)
     req.add_header("X-NCP-APIGW-API-KEY-ID", client_id)
@@ -242,7 +242,7 @@ def fetch_random_naver_news():
         return None
 
 def generate_mafia_game(title, desc, api_key):
-    url = f"[https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=){api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={api_key}"
     prompt = f"""
     뉴스 내용 스파이 찾기 게임 진행자 역할을 수행한다. 다음 실제 뉴스 기사 요약 정보를 바탕으로 게임을 풍성하게 구성한다.
     - 뉴스 제목: {title}
@@ -297,7 +297,7 @@ def generate_mafia_game(title, desc, api_key):
     }
 
 def get_kung_reply(user_word, last_word, api_key):
-    url = f"[https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=){api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={api_key}"
     prompt = f"""
     뉴스 키워드 쿵쿵따 게임 AI 파트너 역할을 수행한다.
     마지막 단어: '{last_word}'
@@ -410,203 +410,4 @@ else:
                     실시간 뉴스 증언 분석 및 가짜 뉴스 판별 추리 모드
                 </div>
                 <div style="color: #e4e4e7; text-align: left; line-height: 1.8; font-size: 1.05rem; max-width: 650px; margin: 0 auto 30px auto;">
-                    1. 버튼을 누르면 실시간 뉴스 기사와 4명의 AI 용의자가 소집된다.<br>
-                    2. 용의자들의 증언을 메신저 대화로 확인한다.<br>
-                    3. 교묘하게 왜곡된 가짜 뉴스를 퍼트린 스파이를 찾아 지목한다.
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            if st.button("GAME START", use_container_width=True):
-                if not gemini_key or not client_id:
-                    st.error("API Key가 설정되지 않았다!")
-                else:
-                    with st.spinner("실시간 뉴스 소집 및 분석 중..."):
-                        random_item = fetch_random_naver_news()
-                        if random_item:
-                            t = random_item.get('title', '').replace("<b>", "").replace("</b>", "").replace("&quot;", '"').replace("&amp;", "&")
-                            d = random_item.get('description', '').replace("<b>", "").replace("</b>", "").replace("&quot;", '"').replace("&amp;", "&")
-                            l = random_item.get('originallink', random_item.get('link', '#'))
-                            
-                            g_data = generate_mafia_game(t, d, gemini_key)
-                            g_data['title'] = t
-                            g_data['link'] = l
-                            st.session_state['mafia_game_data'] = g_data
-                            
-                            chats = []
-                            for idx, p in enumerate(g_data['players']):
-                                chats.append({"sender": f"{idx+1}번 용의자 [{p['name']}]", "text": p['statement']})
-                            st.session_state['messenger_chats'] = chats
-                            st.session_state['mafia_phase'] = 'debate'
-                            st.rerun()
-
-        elif st.session_state['mafia_phase'] == 'debate':
-            g = st.session_state['mafia_game_data']
-            news_link = g.get('link', '#')
-            news_body = g.get('news_body', '')
-            
-            # 실제 뉴스 기반 풍성한 본문과 원문 링크 출력
-            st.markdown(f"""
-            <div class="in-app-news-reader">
-                <div class="news-reader-header">> BRIEFING: 실시간 출제 뉴스 브리핑</div>
-                <div class="news-reader-title">{g['title']}</div>
-                <div class="news-reader-body">{news_body}</div>
-                <div style="text-align: right;">
-                    <a href="{news_link}" target="_blank" class="news-link-btn">🔗 네이버 원문 기사 전체 읽기 ➔</a>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            # CHATTING ROOM 상단 바
-            st.markdown("""
-            <div class="messenger-top-bar">
-                <div class="messenger-top-title">CHATTING ROOM (용의자 증언 대화창)</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            chat_box = st.container(height=280)
-            with chat_box:
-                st.markdown('<div style="padding: 5px;">', unsafe_allow_html=True)
-                for chat in st.session_state['messenger_chats']:
-                    sender = chat.get('sender', '알 수 없음')
-                    text = chat.get('text', '')
-                    if sender == "태희 (나)":
-                        st.markdown(f"""
-                        <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
-                            <div>
-                                <div style="font-family: 'Galmuri11', monospace; font-size: 0.82rem; color: #ffffff; text-align: right; margin-bottom: 3px; font-weight: 700;">{sender}</div>
-                                <div style="font-family: 'Galmuri11', monospace; background-color: #ca8a04; color: #ffffff; padding: 8px 12px; border: 1px solid #fef08a; font-size: 0.95rem; line-height: 1.4;">{text}</div>
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"""
-                        <div style="display: flex; justify-content: flex-start; margin-bottom: 12px;">
-                            <div>
-                                <div style="font-family: 'Galmuri11', monospace; font-size: 0.82rem; color: #facc15; margin-bottom: 3px; font-weight: 700;">{sender}</div>
-                                <div style="font-family: 'Galmuri11', monospace; background-color: #27272a; color: #f4f4f5; padding: 8px 12px; border: 1px solid #52525b; font-size: 0.95rem; line-height: 1.4;">{text}</div>
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-
-            with st.form(key="msg_form", clear_on_submit=True):
-                user_msg = st.text_input("메시지 입력", placeholder="예: 3번 진술이 이상하다. 거짓말 같다.")
-                msg_submit = st.form_submit_button("전송", use_container_width=True)
-
-            if msg_submit and user_msg.strip():
-                st.session_state['messenger_chats'].append({"sender": "태희 (나)", "text": user_msg.strip()})
-                st.rerun()
-
-            st.markdown("---")
-            st.markdown("### 스파이 지목 투표")
-            player_names = [f"{idx+1}번 용의자: {p['name']}" for idx, p in enumerate(g['players'])]
-            selected_player = st.selectbox("처형할 용의자 선택", options=player_names)
-            
-            if st.button("투표 확정", use_container_width=True):
-                sel_idx = player_names.index(selected_player)
-                st.session_state['selected_vote'] = sel_idx
-                st.session_state['mafia_phase'] = 'result'
-                st.rerun()
-
-        elif st.session_state['mafia_phase'] == 'result':
-            g = st.session_state['mafia_game_data']
-            voted_idx = st.session_state['selected_vote']
-            voted_player = g['players'][voted_idx]
-            spy_player = g['players'][g['spy_index']]
-            
-            st.markdown('<div class="transparent-game-card" style="max-width:750px; margin:0 auto; padding:30px;">', unsafe_allow_html=True)
-            st.markdown(f"### 심판 결과")
-            st.markdown(f"**{voted_player['name']}의 최후 변론**: \"{g['defense']}\"")
-            st.markdown("---")
-            
-            if voted_idx == g['spy_index']:
-                st.success(f"[시민 승리] {voted_player['name']}(은)는 진짜 스파이였다! (+20점)")
-                st.session_state['total_score'] += 20
-            else:
-                st.error(f"[스파이 승리] 시민({voted_player['name']})이 처형당했다! 진짜 스파이는 {spy_player['name']}이다!")
-
-            st.info(f"팩트체크: {g['fact_check']}")
-            
-            if st.button("다음 사건 진행", use_container_width=True):
-                st.session_state['mafia_phase'] = 'init'
-                st.session_state['messenger_chats'] = []
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-
-    # [뉴스 키워드 쿵쿵따 모드]
-    elif st.session_state['active_chat_game'] == "kungkungta":
-        st.markdown(f"### 뉴스 키워드 쿵쿵따 (현재 제시어: **{st.session_state['kung_current_word']}** / 끝 글자: **'{st.session_state['kung_current_word'][-1]}'**)")
-        st.markdown("""
-        <div style="color: #facc15; font-size: 1.1rem; font-weight: 500; margin-bottom: 15px;">
-            AI 파트너와 진행하는 실시간 시사 끝말잇기 대결
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # 쿵쿵따 게임 화면 상단에 연동된 실시간 뉴스 기사 브리핑 박스 출력
-        if st.session_state.get('kung_news_data'):
-            k_news = st.session_state['kung_news_data']
-            st.markdown(f"""
-            <div class="in-app-news-reader">
-                <div class="news-reader-header">> CURRENT ISSUE: 쿵쿵따 배경 시사 뉴스</div>
-                <div class="news-reader-title">{k_news['title']}</div>
-                <div class="news-reader-body">{k_news['description']}</div>
-                <div style="text-align: right;">
-                    <a href="{k_news['link']}" target="_blank" class="news-link-btn">🔗 네이버 원문 기사 전체 읽기 ➔</a>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown("---")
-
-        st.markdown("""
-        <div class="messenger-top-bar">
-            <div class="messenger-top-title">QUIZ ROOM</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        kung_box = st.container(height=290)
-        with kung_box:
-            st.markdown('<div style="padding: 5px;">', unsafe_allow_html=True)
-            for chat in st.session_state['kung_history']:
-                text = chat.get('text', '')
-                if chat.get('role'] == 'ai':
-                    st.markdown(f"""
-                    <div style="display: flex; justify-content: flex-start; margin-bottom: 12px;">
-                        <div>
-                            <div style="font-family: 'Galmuri11', monospace; font-size: 0.82rem; color: #facc15; margin-bottom: 3px; font-weight: 700;">AI SHOW HOST</div>
-                            <div style="font-family: 'Galmuri11', monospace; background-color: #27272a; color: #f4f4f5; padding: 8px 12px; border: 1px solid #52525b; font-size: 0.95rem; line-height: 1.4;">{text}</div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown(f"""
-                    <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
-                        <div>
-                            <div style="font-family: 'Galmuri11', monospace; font-size: 0.82rem; color: #ffffff; text-align: right; margin-bottom: 3px; font-weight: 700;">태희 (나)</div>
-                            <div style="font-family: 'Galmuri11', monospace; background-color: #ca8a04; color: #ffffff; padding: 8px 12px; border: 1px solid #fef08a; font-size: 0.95rem; line-height: 1.4;">{text}</div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        with st.form(key="kung_form", clear_on_submit=True):
-            user_word = st.text_input("단어 입력", placeholder=f"'{st.session_state['kung_current_word'][-1]}'로 시작하는 단어")
-            kung_submit = st.form_submit_button("단어 전송", use_container_width=True)
-
-        if kung_submit:
-            if not user_word.strip():
-                st.warning("단어를 입력해라!")
-            elif not gemini_key:
-                st.error("API Key가 설정되지 않았다!")
-            else:
-                last_w = st.session_state['kung_current_word']
-                res = get_kung_reply(user_word.strip(), last_w, gemini_key)
-                
-                st.session_state['kung_history'].append({"role": "user", "text": user_word.strip()})
-                st.session_state['kung_history'].append({"role": "ai", "text": res.get('reply_text', '')})
-                
-                if res.get('status'] == 'success':
-                    st.session_state['total_score'] += 10
-                    st.session_state['kung_current_word'] = res.get('next_word', last_w)
-                st.rerun()
+                    1. 버튼을 누르면 실시간 뉴스
